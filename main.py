@@ -1,5 +1,5 @@
 def main():
-    print("Hello from fast-lmm!")
+    print("evo-lmm environment ready")
 
 
 if __name__ == "__main__":

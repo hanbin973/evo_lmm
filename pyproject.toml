@@ -1,5 +1,5 @@
 [project]
-name = "fast-lmm"
+name = "evo-lmm"
 version = "0.1.0"
 description = "Evolutionary random-effects linear mixed models backed by genotype representation graphs"
 readme = "README.md"

@@ -17,7 +17,7 @@ the model parameters.
 | `pyproject.toml` / `uv.lock` | Python project metadata and reproducible dependency lock. |
 
 Add new model code under a dedicated first-party package (for example,
-`src/fast_lmm/`) rather than expanding `main.py`. Put tests in `tests/` with a
+`src/evo_lmm/`) rather than expanding `main.py`. Put tests in `tests/` with a
 parallel module layout.
 
 ## Environment and dependencies
@@ -29,7 +29,7 @@ parallel module layout.
 - Initialize submodules before installing: `git submodule update --init --recursive`.
 - GRGL compiles native code. Keep build artifacts out of version control and
   document any added system-level build requirement in `README.md`.
-- Do not edit files in `grgl/` as part of fast-lmm work. If GRGL needs a change,
+- Do not edit files in `grgl/` as part of evo-lmm work. If GRGL needs a change,
   make it in the submodule repository and update this repository's recorded
   submodule commit deliberately.
 

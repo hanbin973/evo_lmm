@@ -1,6 +1,6 @@
-# fast-lmm
+# evo-lmm
 
-`fast-lmm` is a Python implementation of the evolutionary random-effects
+`evo-lmm` is a Python implementation of the evolutionary random-effects
 model developed in [the accompanying notes](notes/stab1_genetics_template.pdf).
 It couples a stabilizing-selection model to a linear mixed model (LMM), using
 [GRGL](https://github.com/hanbin973/grgl) to store and traverse genotype
@@ -58,7 +58,7 @@ native dependencies:
 
 ```bash
 git clone --recurse-submodules <repository-url>
-cd fast_lmm
+cd evo_lmm
 uv sync
 ```
 
