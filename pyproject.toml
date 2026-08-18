@@ -5,6 +5,7 @@ description = "Evolutionary random-effects linear mixed models backed by genotyp
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "grapp",
     "msprime>=1.4.2",
     "numpy>=2.0",
     "pygrgl",
@@ -12,7 +13,23 @@ dependencies = [
     "tskit>=1.0.3",
 ]
 
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.uv.sources]
 # The Python distribution supplied by the grgl submodule is named ``pygrgl``.
 # Keep it editable so changes to the checked-out submodule are used locally.
 pygrgl = { path = "grgl", editable = true }
+grapp = { path = "grapp", editable = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -49,6 +49,8 @@ parameters because the coupling is fixed rather than separately estimated.
 ├── grapp/      Git submodule: reference GRGL-backed BOLT-LMM implementation
 ├── notes/      Scientific specification for the evolutionary model
 ├── plan/       Concrete implementation plans
+├── src/evo_lmm/ First-party evolutionary LMM package
+├── tests/      Dense, GRG, REML, and LOCO verification
 ├── main.py     Temporary command-line entry point
 ├── pyproject.toml
 └── AGENTS.md   Development conventions and model invariants
@@ -80,15 +82,15 @@ git submodule update --init --recursive
 uv sync
 ```
 
-`uv` installs the GRGL submodule's Python distribution, `pygrgl`, as an
-editable local dependency. GRAPP is currently pinned as reference code for the
-evolutionary BOLT-LMM implementation plan; it will become an editable project
-dependency when that implementation is scaffolded.
+`uv` installs the GRGL submodule's Python distribution, `pygrgl`, and the GRAPP
+reference implementation as editable local dependencies. The first-party
+package accesses GRAPP through a small compatibility adapter; neither
+submodule is modified by evo-lmm changes.
 
 Verify the setup with:
 
 ```bash
-uv run python -c "import pygrgl, msprime, numpy, scipy, tskit; print('environment ready')"
+uv run python -c "import evo_lmm, pygrgl, grapp, msprime, numpy, scipy, tskit; print('environment ready')"
 ```
 
 ## Development
@@ -96,6 +98,39 @@ uv run python -c "import pygrgl, msprime, numpy, scipy, tskit; print('environmen
 Run the current entry point with `uv run python main.py`. Keep dependency
 changes in `pyproject.toml` and regenerate the lockfile with `uv lock` (or
 `uv sync`). See [AGENTS.md](AGENTS.md) for implementation conventions.
+
+## Library example
+
+The public API keeps evolutionary model weights separate from the
+BOLT-normalised test-genotype operator. Dense arrays are useful for small
+simulations and tests; GRG chromosomes can be passed as a mapping or as
+`(chromosome, grg)` pairs.
+
+```python
+import numpy as np
+from evo_lmm import SimplifiedPrior, fit_evolutionary_lmm
+
+rng = np.random.default_rng(7)
+genotypes = rng.binomial(2, 0.3, size=(64, 20)).astype(float)
+frequencies = genotypes.mean(axis=0) / 2.0
+phenotype = rng.normal(size=genotypes.shape[0])
+
+fit = fit_evolutionary_lmm(
+    genotypes,
+    phenotype,
+    frequencies,
+    model="simplified",
+    initial=SimplifiedPrior(sigma_b2=1.0, tau=0.5),
+    seed=7,
+)
+print(fit.prior, fit.sigma_e2, fit.diagnostics.converged)
+```
+
+`SimplifiedPrior` is the exact `rho^2 = 1` specialization of `FullPrior`.
+`sigma_b2` is the raw-dosage per-locus effect scale; no implicit `1/M` kernel
+normalization is applied. `tau=0`, `rho=0`, monomorphic frequencies, and the
+full-model `rho=1` boundary are supported explicitly and reported in fit
+diagnostics when they are weakly identified.
 
 The notes are the scientific source of truth. In particular, preserve the
 distinction between the observed focal-trait effect `beta_j` and the latent
