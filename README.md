@@ -102,25 +102,33 @@ changes in `pyproject.toml` and regenerate the lockfile with `uv lock` (or
 ## Library example
 
 The public API keeps evolutionary model weights separate from the
-BOLT-normalised test-genotype operator. Dense arrays are useful for small
-simulations and tests; GRG chromosomes can be passed as a mapping or as
-`(chromosome, grg)` pairs.
+BOLT-normalised test-genotype operator. This example simulates a diploid
+msprime tree sequence, converts it to GRG through `pygrgl.grg_from_trees`,
+samples raw-dosage effects from the postulated prior, and fits the resulting
+phenotype through the GRG-backed path.
 
 ```python
-import numpy as np
-from evo_lmm import SimplifiedPrior, fit_evolutionary_lmm
+from evo_lmm import (
+    SimplifiedPrior,
+    fit_evolutionary_bolt_lmm,
+    simulate_grg_lmm,
+)
 
-rng = np.random.default_rng(7)
-genotypes = rng.binomial(2, 0.3, size=(64, 20)).astype(float)
-frequencies = genotypes.mean(axis=0) / 2.0
-phenotype = rng.normal(size=genotypes.shape[0])
+simulation = simulate_grg_lmm(
+    SimplifiedPrior(sigma_b2=0.8, tau=0.5),
+    n_individuals=24,
+    sequence_length=100_000,
+    mutation_rate=2e-7,
+    residual_variance=0.4,
+    seed=7,
+)
 
-fit = fit_evolutionary_lmm(
-    genotypes,
-    phenotype,
-    frequencies,
+fit = fit_evolutionary_bolt_lmm(
+    [("simulated", simulation.grg)],
+    simulation.phenotype,
+    frequencies={"simulated": simulation.frequencies},
     model="simplified",
-    initial=SimplifiedPrior(sigma_b2=1.0, tau=0.5),
+    initial=simulation.prior,
     seed=7,
 )
 print(fit.prior, fit.sigma_e2, fit.diagnostics.converged)

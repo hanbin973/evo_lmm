@@ -32,6 +32,7 @@ from .reml import (
     restricted_log_likelihood,
 )
 from .results import AssociationResult, FitDiagnostics, FitResult
+from .simulation import GrgSimulation, simulate_grg_lmm
 
 __all__ = [
     "AssociationResult",
@@ -42,6 +43,7 @@ __all__ = [
     "FitResult",
     "FullPrior",
     "SimplifiedPrior",
+    "GrgSimulation",
     "VariantData",
     "allele_frequency_q",
     "association",
@@ -65,4 +67,5 @@ __all__ = [
     "prior_from_parameters",
     "restricted_log_likelihood",
     "sample_allele_frequencies",
+    "simulate_grg_lmm",
 ]
