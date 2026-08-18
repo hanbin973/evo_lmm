@@ -188,7 +188,6 @@ src/evo_lmm/
 ├── operators.py       Weighted model kernel and unweighted test operators
 ├── reml.py            Matrix-free average-information REML solver
 ├── trace.py           Shared Hutchinson and optional XTrace estimators
-├── preconditioner.py  Randomized projected-kernel Nyström preconditioner
 ├── bolt.py            End-to-end fit, LOCO solves, calibration, association
 ├── results.py         Typed fit diagnostics and association result objects
 └── grapp_backend.py   All imports/adaptation from the pinned GRAPP commit
@@ -276,7 +275,7 @@ apply_h(vector, phi, exclude_chrom=None)
 apply_dh(vector, phi, parameter, exclude_chrom=None)
 apply_k(vector, theta, exclude_chrom=None)
 apply_dk(vector, theta, parameter, exclude_chrom=None)
-solve_ph(rhs_columns, phi, preconditioner=None, exclude_chrom=None)
+solve_ph(rhs_columns, phi, exclude_chrom=None)
 test_scores(chrom, vector)
 test_column(chrom, local_idx)
 kernel_trace(theta, exclude_chrom=None)
@@ -481,7 +480,7 @@ AI matrix, iteration direction, parameter recovery, and nested-model
 equivalence. Stochastic Lanczos log-determinants are optional diagnostics, not
 part of the first production fitting path.
 
-### 5.4 Matvec reduction, initialization, and preconditioning
+### 5.4 Matvec reduction and initialization
 
 Adopt the applicable techniques from
 [`tslmm/tslmm.py`](https://github.com/hanbin973/tslmm/blob/main/tslmm/tslmm.py):
@@ -494,8 +493,7 @@ Adopt the applicable techniques from
   throughout an accepted AI iteration.
 - Profile the global covariance scale instead of estimating a redundant scale
   coordinate stochastically.
-- Offer randomized Haseman-Elston initialization and a randomized low-rank
-  covariance preconditioner.
+- Offer randomized Haseman-Elston initialization.
 
 For each initial `(tau, r)` shape, use a stochastic Haseman-Elston moment fit
 to initialize `sigma_b2`, `sigma_e2`, and hence `delta`. With ordinary
@@ -508,33 +506,9 @@ covariate projection `P_C`, solve
 
 Use the same trace-estimator infrastructure as REML, reject negative moment
 solutions, and fall back to an equal phenotype-variance split. This is an
-initializer only, not the final estimator.
-
-Adopt a randomized Nyström/eigendecomposition preconditioner for the projected
-reference kernel `P_C K(tau_ref, r_ref) P_C`. Build an orthonormal basis `U`
-from a Gaussian sketch using one stabilized randomized range pass (with an
-optional power iteration), and retain the small positive Ritz matrix `B` such
-that `K_ref ~= U B U^T`. Ensure `P_C U = U`.
-
-For scale-free covariance `H = K + delta I`, apply the inverse approximation
-
-```text
-M^-1 b = delta^-1 * (b - U U^T b)
-         + U (B + delta I)^-1 U^T b.
-```
-
-The same batched formula applies to every CG RHS. Update the diagonal shift
-exactly as `delta` changes. Because `K(tau, r)` changes shape rather than only
-scale, build the basis at each multistart's initial shape and reuse it while CG
-iteration counts remain stable. Refresh it after an accepted iterate when the
-median CG iteration count exceeds 1.5 times its post-build baseline or the
-preconditioned residual stalls. A refresh must pay for itself across the
-remaining expected solves; otherwise retain the old basis or disable it.
-
-Expose rank, oversampling, power-iteration count, refresh threshold, and random
-seed. Benchmark candidate ranks `0`, `32`, `64`, and `128` on the first AI
-iteration and select by total elapsed GRGL time, including sketch construction,
-rather than CG iteration count alone. Keep rank `0` as the correctness fallback.
+initializer only, not the final estimator. The initial implementation uses
+unpreconditioned synchronized CG. Changing-kernel Nyström preconditioning is
+retained only as a future optimization in Section 9.
 
 ### 5.5 Identifiability and boundaries
 
@@ -617,8 +591,7 @@ every LOCO kernel match dense multiplication.
 - Implement exact data quadratics, Hutchinson score traces with fixed common
   probes, optional XTrace, and the nonlinear average-information matrix from
   Theorem 6.
-- Add stochastic Haseman-Elston initialization and the adaptive randomized
-  Nyström preconditioner, including a rank-zero fallback.
+- Add stochastic Haseman-Elston initialization.
 - Add transformed-parameter AI updates, condition-based damping, step capping,
   score-norm step halving, convergence checks, and weak-identification
   diagnostics.
@@ -646,9 +619,8 @@ association statistics are calibrated; full `r=1` reproduces simplified output.
   solve costs before optimizing.
 - Batch trace-probe and derivative right-hand sides, reuse score vectors, and
   add CuPy parity only after CPU correctness.
-- Measure preconditioner construction plus solve time and XTrace error per
-  weighted-GRGL matvec equivalent; retain each only when it improves the full
-  fit, not merely a microbenchmark.
+- Measure XTrace error per weighted-GRGL matvec equivalent; retain it only when
+  it improves the full fit, not merely a microbenchmark.
 
 Gate: memory remains `O(N * probes + M)` rather than `O(NM)`, CPU/GPU results
 agree within tolerance, and whole-genome LOCO does not rebuild dense matrices.
@@ -692,12 +664,8 @@ agree within tolerance, and whole-genome LOCO does not rebuild dense matrices.
 - Profiled `sigma_b2` and derived `sigma_e2` match a joint dense REML fit.
 - Synchronized multi-RHS CG matches independent dense/CG solves for every
   column and uses one covariance matmat per iteration.
-- The Nyström preconditioner is symmetric positive definite on the projected
-  subspace, preserves solutions, and reduces total timed GRGL work on an
-  ill-conditioned fixture after including construction cost.
-- Preconditioner refresh and rank-zero fallback are deterministic under a
-  fixed seed; XTrace and Hutchinson both cover exact traces within their
-  reported Monte Carlo uncertainty.
+- XTrace and Hutchinson both cover exact traces within their reported Monte
+  Carlo uncertainty.
 - Boundary/non-identification cases return diagnostics rather than unstable
   point estimates.
 - Reported `sigma_b2` is invariant to any internal numerical rescaling.
@@ -712,7 +680,35 @@ agree within tolerance, and whole-genome LOCO does not rebuild dense matrices.
   simulations compare BLUP accuracy across conventional, simplified, and full
   priors.
 
-## 9. Definition of done
+## 9. Future potential: changing-kernel preconditioning
+
+Nyström preconditioning is not part of the initial implementation phases,
+required tests, or definition of done. Reconsider it only after profiling
+shows that unpreconditioned synchronized CG dominates total fit time.
+
+If pursued, approximate a projected reference kernel as
+`P_C K_ref P_C ~= U B U^T` and apply
+
+```text
+M^-1 b = delta^-1 * (b - U U^T b)
+         + U (B + delta I)^-1 U^T b.
+```
+
+Unlike TSLMM's constant kernel, `K(tau, r)` changes during optimization. A
+future implementation must therefore treat `(U, B)` as a possibly stale SPD
+preconditioner, freeze it within every CG solve, and rebuild only between
+accepted REML iterations. Updating `delta` is cheap and does not require a new
+sketch; changing `tau` or `r` may change the dominant subspace.
+
+Evaluate ranks `32`, `64`, and `128` against the unpreconditioned baseline.
+Include sketch construction and every refresh in end-to-end timing. Consider a
+refresh only when CG iterations exceed `1.5` times their post-build baseline
+or residuals stall, and only when predicted remaining solve savings exceed
+the measured rebuild cost. Required experimental checks would establish SPD,
+solution preservation, deterministic refresh behavior, and a reduction in
+total timed GRGL work, not merely iteration count.
+
+## 10. Definition of done
 
 The feature is complete when both priors can be selected through a typed
 library API; all prior and nuisance parameters are fitted and reported in their
