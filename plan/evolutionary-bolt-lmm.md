@@ -187,6 +187,8 @@ src/evo_lmm/
 ├── grg_data.py        Frequency extraction, sample masks, variant eligibility
 ├── operators.py       Weighted model kernel and unweighted test operators
 ├── reml.py            Matrix-free average-information REML solver
+├── trace.py           Shared Hutchinson and optional XTrace estimators
+├── preconditioner.py  Randomized projected-kernel Nyström preconditioner
 ├── bolt.py            End-to-end fit, LOCO solves, calibration, association
 ├── results.py         Typed fit diagnostics and association result objects
 └── grapp_backend.py   All imports/adaptation from the pinned GRAPP commit
@@ -233,11 +235,14 @@ Optimization uses unconstrained coordinates but results expose scientific
 parameters:
 
 ```text
-log_sigma_b2 -> sigma_b2 > 0
-log_tau      -> tau > 0
-log_sigma_e2 -> sigma_e2 > 0
-logit_r      -> r in (0, 1), reported as both rho2=r and rho=sqrt(r)
+log_delta -> delta = sigma_e2 / sigma_b2 > 0
+log_tau   -> tau > 0
+logit_r   -> r in (0, 1), reported as both rho2=r and rho=sqrt(r)
 ```
+
+`sigma_b2` is profiled analytically at every shape-parameter iterate and
+`sigma_e2 = delta * sigma_b2` is derived afterward; neither is a separate
+optimizer coordinate.
 
 Optimize `r = rho^2` directly because it is the identifiable quantity in the
 variance formula. Accept `rho` at the user boundary and document that its sign
@@ -267,11 +272,11 @@ Implement an `EvolutionaryLmmOps` object with the following explicit methods:
 ```text
 apply_model_x(weights, theta, exclude_chrom=None)
 model_scores(vector, theta, exclude_chrom=None)
-apply_v(vector, theta, exclude_chrom=None)
-apply_dv(vector, theta, parameter, exclude_chrom=None)
+apply_h(vector, phi, exclude_chrom=None)
+apply_dh(vector, phi, parameter, exclude_chrom=None)
 apply_k(vector, theta, exclude_chrom=None)
 apply_dk(vector, theta, parameter, exclude_chrom=None)
-solve_p(rhs_columns, theta, exclude_chrom=None)
+solve_ph(rhs_columns, phi, preconditioner=None, exclude_chrom=None)
 test_scores(chrom, vector)
 test_column(chrom, local_idx)
 kernel_trace(theta, exclude_chrom=None)
@@ -313,42 +318,66 @@ models*](../notes/1805.05188v1.pdf), Theorems 3 and 6, as the REML algorithmic
 specification.
 
 Let `C` denote the fixed-effect design matrix so that `X` remains the raw
-genotype operator. For either evolutionary prior,
+genotype operator. Factor out the overall focal-effect scale:
 
 ```text
-V(theta) = sigma_b2 * K(tau, r) + sigma_e2 * I,
+V = sigma_b2 * H(phi),
+H(phi) = K(tau, r) + delta * I,
+delta = sigma_e2 / sigma_b2,
 
 P_V = V^-1 - V^-1 C (C^T V^-1 C)^-1 C^T V^-1.
 ```
 
-The simplified model omits `r`. The complete optimization coordinates are
+The simplified model omits `r`. Following the scale-factorization opportunity
+noted in TSLMM, optimize only the covariance-shape coordinates
 
 ```text
-simplified: theta = (log_sigma_b2, log_sigma_e2, log_tau)
-full:       theta = (log_sigma_b2, log_sigma_e2, log_tau, logit_r).
+simplified: phi = (log_delta, log_tau)
+full:       phi = (log_delta, log_tau, logit_r).
 ```
 
-Thus the two/three parameter counts refer to the genetic prior; `sigma_e2` is
-an additional nuisance variance component. Report `delta = sigma_e2 /
-sigma_b2` for compatibility with GRAPP after fitting, but do not optimize only
-`delta`: the evolutionary parameters and `sigma_b2` must retain their
-scientific units.
+At every shape iterate, solve with `H`, let `P_H` be its REML projection, and
+profile the overall scale exactly:
 
-For each coordinate `theta_i`, define `V_i = dV / dtheta_i`. The score from
-Theorem 3 is
+```text
+d                = N - rank(C)
+q                = y^T P_H y
+sigma_b2_hat(phi)= q / d
+sigma_e2_hat(phi)= delta * sigma_b2_hat(phi).
+```
+
+This removes one nonlinear coordinate and one stochastic trace while still
+reporting `sigma_b2` and `sigma_e2` in their scientific units. The two/three
+parameter counts continue to describe the genetic prior; residual variance is
+the additional nuisance component represented by `delta` during fitting.
+
+For a general coordinate `theta_i`, define `V_i = dV / dtheta_i`. The score
+from Theorem 3 is
 
 ```text
 S_i = 0.5 * [y^T P_V V_i P_V y - tr(P_V V_i)].
 ```
 
-The first-derivative operators are
+For implementation and validation, regard the full coordinate vector as
+`theta = (log_sigma_b2, phi)`. Its first-derivative operators are
 
 ```text
-V_log_sigma_b2 u = sigma_b2 * K u
-V_log_sigma_e2 u = sigma_e2 * u
+V_log_sigma_b2 u = V u
+V_log_delta u    = sigma_b2 * delta * u
 V_log_tau u      = sigma_b2 * dK/dlog_tau u
 V_logit_r u      = sigma_b2 * dK/dlogit_r u       # full model only.
 ```
+
+Profiling makes the scale score exactly zero because
+`tr(P_V V) = d`. Form the full average-information matrix, then eliminate the
+scale row/column with its Schur complement before updating `phi`:
+
+```text
+AI_profile = AI_phi,phi
+             - AI_phi,scale * AI_scale,scale^-1 * AI_scale,phi.
+```
+
+This is the AI analogue of optimizing the profiled restricted likelihood.
 
 Our covariance is nonlinear in `tau` and `r`, so `V_ij = d2V /
 dtheta_i dtheta_j` is generally nonzero. Theorem 6 shows that the usual
@@ -378,41 +407,68 @@ theta_(k+1) = theta_k + step_k.
 
 Compute one iteration as follows:
 
-1. Build the current per-variant weights and first derivatives.
-2. Compute `xi = P_V y` with projected CG. Concretely, solve
-   `P_C V P_C xi = P_C y` subject to `xi = P_C xi`; this error-contrast solve
-   is the action of `P_V` without forming `P_V` or an explicit basis for the
-   orthogonal complement.
-3. For every parameter, compute `eta_i = V_i xi`.
-4. Compute `zeta_i = P_V eta_i` with one batched multi-right-hand-side CG call.
-5. Form the data quadratic `q_i = xi^T eta_i` and
-   `AI_ij = 0.5 * eta_i^T zeta_j`.
-6. Estimate each score trace with common Rademacher probes `z_l`:
+1. Build the current per-variant weights and first derivatives of `H`.
+2. Draw the trace probes once at fit initialization and keep them fixed. In one
+   synchronized multi-right-hand-side projected-CG batch, solve
 
    ```text
-   p_l = P_V z_l
-   tr(P_V V_i) ~= (1 / L) * sum_l p_l^T (V_i z_l).
+   P_C H P_C [xi, p_1, ..., p_L] = P_C [y, z_1, ..., z_L]
    ```
 
-   Solve for every `p_l` in one batched CG call. Reuse the same seeded probes
-   at every nonlinear iteration so the approximate score is a deterministic
-   function of `theta`.
-7. Form `S`, symmetrize `AI`, add minimal diagonal damping if its condition
+   subject to every solution column lying in the covariate-orthogonal
+   subspace. Thus `xi = P_H y` and `p_l = P_H z_l`. This is one batched GRGL
+   `matmat` per CG iteration, not `L+1` independent GRGL traversals.
+3. Profile `sigma_b2 = (y^T xi)/d` and derive `sigma_e2`.
+4. For every full coordinate, including scale, compute `eta_i = V_i P_V y`.
+   Equivalently use scale-free `H_i xi` and apply the required scalar factors
+   in the small score/AI algebra.
+5. In one second synchronized CG batch, compute all `zeta_i = P_H eta_i`.
+6. Form the data quadratics and full AI matrix from small inner products, then
+   use the scale Schur complement to obtain `AI_profile`.
+7. Estimate every non-scale score trace from the already-solved common probes:
+
+   ```text
+   tr(P_H H_i) ~= (1 / L) * sum_l p_l^T (H_i z_l).
+   ```
+
+   This shares all inverse applications across parameters; each additional
+   evolutionary parameter costs derivative matvecs but no additional CG
+   solve. The scale trace is the exact value `d`.
+8. Form the profiled score, symmetrize `AI_profile`, add minimal diagonal
+   damping if its condition
    number is poor, solve for the step, and cap the step in transformed
    coordinates.
-8. Use step halving until the scaled score norm decreases and `V` remains
+9. Use step halving until the scaled score norm decreases and `H` remains
    positive definite. Recompute `S` after every trial step.
 
-The score requires stochastic traces, but the AI matrix itself requires only
-one `P_V y` solve, first-derivative matvecs, batched `P_V eta_i` solves, and
-small dense inner products. This is the computational benefit emphasized by
-Theorem 6 and Algorithm 4 of the paper.
+Implement synchronized independent CG in the style used by TSLMM: all columns
+share one `H.matmat(search_directions)` call per iteration, while recurrence
+coefficients and residual tests remain per column. Remove converged columns
+from the active block rather than stopping on one Frobenius norm. Warm-start
+the phenotype, probe, and derivative solutions from the preceding accepted AI
+iterate and from the preceding step-halving trial.
+
+The complete AI iteration therefore has two sequential inverse stages: one for
+`[y, probes]` and one for all derivative right-hand sides. Its expensive GRGL
+traversal count depends primarily on CG iterations, not on the number of probes
+or fitted prior parameters. The score requires stochastic traces, but the AI
+matrix itself uses only first-derivative matvecs, the second CG batch, and small
+dense inner products. This is the computational benefit emphasized by Theorem
+6 and Algorithm 4 of the REML paper and realized with TSLMM-style batching.
 
 Stop when both the maximum transformed-parameter step and the Fisher-scaled
 score norm are below tolerance. Record the random seed, trace-probe count, CG
 tolerance and iterations, AI condition number/damping, accepted step length,
-score norm, and boundary hits. Increase the fixed probe count and retry when
-trace Monte Carlo error prevents score convergence.
+score norm, active RHS count, and boundary hits. Increase the fixed probe count
+and retry when trace Monte Carlo error prevents score convergence.
+
+Use shared-probe Hutchinson as the default because it amortizes every `P_H`
+solve across all derivative traces. Also implement TSLMM's XTrace strategy as
+an optional high-accuracy mode. XTrace uses two operator-query blocks to build
+and correct a randomized range approximation; enable it only when a pilot
+comparison shows that it reaches the requested trace error with fewer total
+weighted-GRGL matvec equivalents than shared Hutchinson. Report the estimator
+and its empirical standard error.
 
 Implement an exact dense REML oracle for small test data using
 
@@ -425,7 +481,62 @@ AI matrix, iteration direction, parameter recovery, and nested-model
 equivalence. Stochastic Lanczos log-determinants are optional diagnostics, not
 part of the first production fitting path.
 
-### 5.4 Identifiability and boundaries
+### 5.4 Matvec reduction, initialization, and preconditioning
+
+Adopt the applicable techniques from
+[`tslmm/tslmm.py`](https://github.com/hanbin973/tslmm/blob/main/tslmm/tslmm.py):
+
+- QR-orthonormalize covariates once and standardize the phenotype during
+  numerical fitting; transform variance estimates and fixed effects back to
+  original units in the result.
+- Use synchronized multi-RHS CG so one GRGL `matmat` advances all RHS columns.
+- Reuse `P_H y`, fixed trace probes, derivative products, and warm starts
+  throughout an accepted AI iteration.
+- Profile the global covariance scale instead of estimating a redundant scale
+  coordinate stochastically.
+- Offer randomized Haseman-Elston initialization and a randomized low-rank
+  covariance preconditioner.
+
+For each initial `(tau, r)` shape, use a stochastic Haseman-Elston moment fit
+to initialize `sigma_b2`, `sigma_e2`, and hence `delta`. With ordinary
+covariate projection `P_C`, solve
+
+```text
+[tr(P_C K P_C K), tr(P_C K)] [sigma_b2] = [y^T P_C K P_C y]
+[tr(P_C K),       d        ] [sigma_e2]   [y^T P_C y        ].
+```
+
+Use the same trace-estimator infrastructure as REML, reject negative moment
+solutions, and fall back to an equal phenotype-variance split. This is an
+initializer only, not the final estimator.
+
+Adopt a randomized Nyström/eigendecomposition preconditioner for the projected
+reference kernel `P_C K(tau_ref, r_ref) P_C`. Build an orthonormal basis `U`
+from a Gaussian sketch using one stabilized randomized range pass (with an
+optional power iteration), and retain the small positive Ritz matrix `B` such
+that `K_ref ~= U B U^T`. Ensure `P_C U = U`.
+
+For scale-free covariance `H = K + delta I`, apply the inverse approximation
+
+```text
+M^-1 b = delta^-1 * (b - U U^T b)
+         + U (B + delta I)^-1 U^T b.
+```
+
+The same batched formula applies to every CG RHS. Update the diagonal shift
+exactly as `delta` changes. Because `K(tau, r)` changes shape rather than only
+scale, build the basis at each multistart's initial shape and reuse it while CG
+iteration counts remain stable. Refresh it after an accepted iterate when the
+median CG iteration count exceeds 1.5 times its post-build baseline or the
+preconditioned residual stalls. A refresh must pay for itself across the
+remaining expected solves; otherwise retain the old basis or disable it.
+
+Expose rank, oversampling, power-iteration count, refresh threshold, and random
+seed. Benchmark candidate ranks `0`, `32`, `64`, and `128` on the first AI
+iteration and select by total elapsed GRGL time, including sketch construction,
+rather than CG iteration count alone. Keep rank `0` as the correctness fallback.
+
+### 5.5 Identifiability and boundaries
 
 - At `tau = 0`, both priors reduce to constant raw-effect variance and `r` is
   not identifiable.
@@ -497,18 +608,27 @@ every LOCO kernel match dense multiplication.
 
 ### Phase 3 - matrix-free REML
 
-- Implement matrix-free `P_V` actions with projected, batched CG.
+- Implement matrix-free `P_H` actions with synchronized projected CG, including
+  active-column convergence and warm starts.
+- Batch `[y, trace_probes]` in the first inverse stage and every derivative RHS
+  in the second stage.
+- Profile `sigma_b2`, derive `sigma_e2`, and eliminate the scale coordinate
+  from AI with a Schur complement.
 - Implement exact data quadratics, Hutchinson score traces with fixed common
-  probes, and the nonlinear average-information matrix from Theorem 6.
+  probes, optional XTrace, and the nonlinear average-information matrix from
+  Theorem 6.
+- Add stochastic Haseman-Elston initialization and the adaptive randomized
+  Nyström preconditioner, including a rank-zero fallback.
 - Add transformed-parameter AI updates, condition-based damping, step capping,
   score-norm step halving, convergence checks, and weak-identification
   diagnostics.
 - Cache parameter-independent quantities and reuse common random probes.
 
-Gate: matrix-free `P_V` actions and AI matrices match the dense oracle; scores
+Gate: matrix-free `P_H` actions and AI matrices match the dense oracle; scores
 match within declared trace-estimation error; increasing the probe count
 reduces that error; seeded runs are reproducible; and accepted AI steps reduce
-the scaled score norm.
+the scaled score norm. Batched solves return the same columns as independent
+solves, while requiring one GRGL operator call per synchronized CG iteration.
 
 ### Phase 4 - end-to-end evolutionary BOLT-LMM
 
@@ -526,6 +646,9 @@ association statistics are calibrated; full `r=1` reproduces simplified output.
   solve costs before optimizing.
 - Batch trace-probe and derivative right-hand sides, reuse score vectors, and
   add CuPy parity only after CPU correctness.
+- Measure preconditioner construction plus solve time and XTrace error per
+  weighted-GRGL matvec equivalent; retain each only when it improves the full
+  fit, not merely a microbenchmark.
 
 Gate: memory remains `O(N * probes + M)` rather than `O(NM)`, CPU/GPU results
 agree within tolerance, and whole-genome LOCO does not rebuild dense matrices.
@@ -557,7 +680,7 @@ agree within tolerance, and whole-genome LOCO does not rebuild dense matrices.
   log-likelihood for both nonlinear priors.
 - Dense average-information entries equal their direct quadratic-form
   definitions and remain valid when second derivatives of `V` are nonzero.
-- Matrix-free `P_V`, score, and AI results agree with the dense oracle within
+- Matrix-free `P_H`, score, and AI results agree with the dense oracle within
   the declared trace Monte Carlo tolerance.
 - Repeated simulations confirm that the omitted Theorem 6 second-derivative
   remainder is centered near zero.
@@ -566,6 +689,15 @@ agree within tolerance, and whole-genome LOCO does not rebuild dense matrices.
 - Fixed probes make repeated fits bitwise or tightly numerically reproducible.
 - Increasing trace probes reduces score error, and an accepted AI iteration
   reduces the Fisher-scaled score norm.
+- Profiled `sigma_b2` and derived `sigma_e2` match a joint dense REML fit.
+- Synchronized multi-RHS CG matches independent dense/CG solves for every
+  column and uses one covariance matmat per iteration.
+- The Nyström preconditioner is symmetric positive definite on the projected
+  subspace, preserves solutions, and reduces total timed GRGL work on an
+  ill-conditioned fixture after including construction cost.
+- Preconditioner refresh and rank-zero fallback are deterministic under a
+  fixed seed; XTrace and Hutchinson both cover exact traces within their
+  reported Monte Carlo uncertainty.
 - Boundary/non-identification cases return diagnostics rather than unstable
   point estimates.
 - Reported `sigma_b2` is invariant to any internal numerical rescaling.
