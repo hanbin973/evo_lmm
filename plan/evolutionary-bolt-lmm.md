@@ -30,7 +30,7 @@ full:       v_j = sigma_b2 *
 Define shape weights `w_j = v_j / sigma_b2`. The simplified prior is exactly
 the `r = 1` boundary of the full prior. The counts above describe the genetic
 prior parameters; residual variance `sigma_e2` remains a nuisance LMM variance
-component in both models and must also be fitted or profiled.
+component in both models and is fitted jointly by AI-REML.
 
 The first implementation target is a library API with deterministic tests. CLI
 exposure and GPU performance follow only after the CPU implementation is
@@ -173,8 +173,8 @@ and standard errors.
 
 Third, GRAPP's secant search estimates one scalar for a fixed kernel. Here the
 kernel shape changes with `tau` and, in the full model, `r`. The new fitter
-therefore needs a multi-parameter REML objective/score with fixed random probes
-across optimizer evaluations.
+therefore solves the multi-parameter REML score equations with an
+average-information update and fixed random probes across iterations.
 
 ## 3. Proposed first-party structure
 
@@ -186,7 +186,7 @@ src/evo_lmm/
 ├── priors.py          Parameter objects, transforms, weights, derivatives
 ├── grg_data.py        Frequency extraction, sample masks, variant eligibility
 ├── operators.py       Weighted model kernel and unweighted test operators
-├── reml.py            Profiled stochastic REML objective and optimizer
+├── reml.py            Matrix-free average-information REML solver
 ├── bolt.py            End-to-end fit, LOCO solves, calibration, association
 ├── results.py         Typed fit diagnostics and association result objects
 └── grapp_backend.py   All imports/adaptation from the pinned GRAPP commit
@@ -267,8 +267,11 @@ Implement an `EvolutionaryLmmOps` object with the following explicit methods:
 ```text
 apply_model_x(weights, theta, exclude_chrom=None)
 model_scores(vector, theta, exclude_chrom=None)
+apply_v(vector, theta, exclude_chrom=None)
+apply_dv(vector, theta, parameter, exclude_chrom=None)
 apply_k(vector, theta, exclude_chrom=None)
 apply_dk(vector, theta, parameter, exclude_chrom=None)
+solve_p(rhs_columns, theta, exclude_chrom=None)
 test_scores(chrom, vector)
 test_column(chrom, local_idx)
 kernel_trace(theta, exclude_chrom=None)
@@ -302,45 +305,127 @@ standardization with prior variance. The unweighted raw `X X^T` operator is
 not sufficient because the evolutionary kernel needs `diag(w)` between the
 two passes.
 
-### 5.2 Restricted likelihood
+### 5.2 Nonlinear average-information REML
 
-Work in the covariate-orthogonal subspace used by GRAPP. For shape parameters
-`eta = (tau)` or `(tau, r)`, define
+Use Zhu and Wathen, [*Essential formulae for restricted maximum likelihood and
+its derivatives associated with the linear mixed
+models*](../notes/1805.05188v1.pdf), Theorems 3 and 6, as the REML algorithmic
+specification.
 
-```text
-H(eta, delta) = K(eta) + delta * I
-delta         = sigma_e2 / sigma_b2.
-```
-
-Profile the scale after solving `H z = P_C y`:
+Let `C` denote the fixed-effect design matrix so that `X` remains the raw
+genotype operator. For either evolutionary prior,
 
 ```text
-sigma_b2_hat = (y^T P_C z) / (N - rank(C))
-sigma_e2_hat = delta * sigma_b2_hat.
+V(theta) = sigma_b2 * K(tau, r) + sigma_e2 * I,
+
+P_V = V^-1 - V^-1 C (C^T V^-1 C)^-1 C^T V^-1.
 ```
 
-Optimize `log(delta)` plus the prior shape coordinates. Estimate the restricted
-`logdet(H)` with stochastic Lanczos quadrature (SLQ), using the same seeded,
-covariate-projected Rademacher probes for every evaluation. CG solves and SLQ
-must share the same projected `H` matvec.
-
-The profiled negative restricted log likelihood, up to constants, is
+The simplified model omits `r`. The complete optimization coordinates are
 
 ```text
-0.5 * [d * log(sigma_b2_hat) + logdet_restricted(H)],
-d = N - rank(C).
+simplified: theta = (log_sigma_b2, log_sigma_e2, log_tau)
+full:       theta = (log_sigma_b2, log_sigma_e2, log_tau, logit_r).
 ```
 
-Start with SciPy `minimize(..., method="L-BFGS-B")` on bounded transformed
-coordinates. Use multiple deterministic starting points for `tau` and `r`.
-Record the seed, probe count, Lanczos steps, CG tolerance, iteration counts,
-gradient norm, and boundary hits in the result.
+Thus the two/three parameter counts refer to the genetic prior; `sigma_e2` is
+an additional nuisance variance component. Report `delta = sigma_e2 /
+sigma_b2` for compatibility with GRAPP after fitting, but do not optimize only
+`delta`: the evolutionary parameters and `sigma_b2` must retain their
+scientific units.
 
-Before relying on SLQ gradients, implement an exact dense restricted
-likelihood for small test data. It is the numerical oracle for objective,
-gradient, parameter recovery, and nested-model equivalence.
+For each coordinate `theta_i`, define `V_i = dV / dtheta_i`. The score from
+Theorem 3 is
 
-### 5.3 Identifiability and boundaries
+```text
+S_i = 0.5 * [y^T P_V V_i P_V y - tr(P_V V_i)].
+```
+
+The first-derivative operators are
+
+```text
+V_log_sigma_b2 u = sigma_b2 * K u
+V_log_sigma_e2 u = sigma_e2 * u
+V_log_tau u      = sigma_b2 * dK/dlog_tau u
+V_logit_r u      = sigma_b2 * dK/dlogit_r u       # full model only.
+```
+
+Our covariance is nonlinear in `tau` and `r`, so `V_ij = d2V /
+dtheta_i dtheta_j` is generally nonzero. Theorem 6 shows that the usual
+average-information term
+
+```text
+AI_ij = 0.5 * y^T P_V V_i P_V V_j P_V y
+```
+
+remains the essential information matrix: the difference between it and the
+exact average of observed and Fisher information is
+
+```text
+IZ_ij = 0.25 * [tr(P_V V_ij) - y^T P_V V_ij P_V y],
+E[IZ_ij] = 0.
+```
+
+Consequently, the nonlinear evolutionary GRM does not require second
+derivatives for AI-REML. Implement only `V_i`/`dK_i` matvecs and solve
+
+```text
+AI(theta_k) * step_k = S(theta_k)
+theta_(k+1) = theta_k + step_k.
+```
+
+### 5.3 Matrix-free AI iteration
+
+Compute one iteration as follows:
+
+1. Build the current per-variant weights and first derivatives.
+2. Compute `xi = P_V y` with projected CG. Concretely, solve
+   `P_C V P_C xi = P_C y` subject to `xi = P_C xi`; this error-contrast solve
+   is the action of `P_V` without forming `P_V` or an explicit basis for the
+   orthogonal complement.
+3. For every parameter, compute `eta_i = V_i xi`.
+4. Compute `zeta_i = P_V eta_i` with one batched multi-right-hand-side CG call.
+5. Form the data quadratic `q_i = xi^T eta_i` and
+   `AI_ij = 0.5 * eta_i^T zeta_j`.
+6. Estimate each score trace with common Rademacher probes `z_l`:
+
+   ```text
+   p_l = P_V z_l
+   tr(P_V V_i) ~= (1 / L) * sum_l p_l^T (V_i z_l).
+   ```
+
+   Solve for every `p_l` in one batched CG call. Reuse the same seeded probes
+   at every nonlinear iteration so the approximate score is a deterministic
+   function of `theta`.
+7. Form `S`, symmetrize `AI`, add minimal diagonal damping if its condition
+   number is poor, solve for the step, and cap the step in transformed
+   coordinates.
+8. Use step halving until the scaled score norm decreases and `V` remains
+   positive definite. Recompute `S` after every trial step.
+
+The score requires stochastic traces, but the AI matrix itself requires only
+one `P_V y` solve, first-derivative matvecs, batched `P_V eta_i` solves, and
+small dense inner products. This is the computational benefit emphasized by
+Theorem 6 and Algorithm 4 of the paper.
+
+Stop when both the maximum transformed-parameter step and the Fisher-scaled
+score norm are below tolerance. Record the random seed, trace-probe count, CG
+tolerance and iterations, AI condition number/damping, accepted step length,
+score norm, and boundary hits. Increase the fixed probe count and retry when
+trace Monte Carlo error prevents score convergence.
+
+Implement an exact dense REML oracle for small test data using
+
+```text
+l_R = -0.5 * [log|V| + log|C^T V^-1 C| + y^T P_V y + constant].
+```
+
+Use exact traces in its score. This oracle validates the matrix-free score,
+AI matrix, iteration direction, parameter recovery, and nested-model
+equivalence. Stochastic Lanczos log-determinants are optional diagnostics, not
+part of the first production fitting path.
+
+### 5.4 Identifiability and boundaries
 
 - At `tau = 0`, both priors reduce to constant raw-effect variance and `r` is
   not identifiable.
@@ -412,12 +497,18 @@ every LOCO kernel match dense multiplication.
 
 ### Phase 3 - matrix-free REML
 
-- Add projected CG, deterministic SLQ, profiled scale, and bounded optimizer.
+- Implement matrix-free `P_V` actions with projected, batched CG.
+- Implement exact data quadratics, Hutchinson score traces with fixed common
+  probes, and the nonlinear average-information matrix from Theorem 6.
+- Add transformed-parameter AI updates, condition-based damping, step capping,
+  score-norm step halving, convergence checks, and weak-identification
+  diagnostics.
 - Cache parameter-independent quantities and reuse common random probes.
-- Add convergence and weak-identification diagnostics.
 
-Gate: matrix-free objectives match the dense oracle within stochastic error;
-increasing probes/Lanczos steps tightens the error; seeded runs are reproducible.
+Gate: matrix-free `P_V` actions and AI matrices match the dense oracle; scores
+match within declared trace-estimation error; increasing the probe count
+reduces that error; seeded runs are reproducible; and accepted AI steps reduce
+the scaled score norm.
 
 ### Phase 4 - end-to-end evolutionary BOLT-LMM
 
@@ -431,9 +522,10 @@ association statistics are calibrated; full `r=1` reproduces simplified output.
 
 ### Phase 5 - performance and GPU
 
-- Profile GRG traversal, CG, and SLQ costs before optimizing.
-- Batch probe matvecs, reuse score vectors, and add CuPy parity only after CPU
-  correctness.
+- Profile GRG traversal, projected CG, derivative matvec, trace-probe, and AI
+  solve costs before optimizing.
+- Batch trace-probe and derivative right-hand sides, reuse score vectors, and
+  add CuPy parity only after CPU correctness.
 
 Gate: memory remains `O(N * probes + M)` rather than `O(NM)`, CPU/GPU results
 agree within tolerance, and whole-genome LOCO does not rebuild dense matrices.
@@ -461,8 +553,19 @@ agree within tolerance, and whole-genome LOCO does not rebuild dense matrices.
 ### Fitting tests
 
 - Exact dense REML recovers parameters on moderate seeded simulations.
-- Matrix-free and dense optima agree within declared Monte Carlo tolerance.
+- Dense analytic scores match finite differences of the restricted
+  log-likelihood for both nonlinear priors.
+- Dense average-information entries equal their direct quadratic-form
+  definitions and remain valid when second derivatives of `V` are nonzero.
+- Matrix-free `P_V`, score, and AI results agree with the dense oracle within
+  the declared trace Monte Carlo tolerance.
+- Repeated simulations confirm that the omitted Theorem 6 second-derivative
+  remainder is centered near zero.
+- Matrix-free and dense parameter estimates agree within declared Monte Carlo
+  tolerance.
 - Fixed probes make repeated fits bitwise or tightly numerically reproducible.
+- Increasing trace probes reduces score error, and an accepted AI iteration
+  reduces the Fisher-scaled score norm.
 - Boundary/non-identification cases return diagnostics rather than unstable
   point estimates.
 - Reported `sigma_b2` is invariant to any internal numerical rescaling.
