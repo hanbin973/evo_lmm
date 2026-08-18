@@ -1,3 +1,6 @@
 [submodule "grgl"]
 	path = grgl
 	url = https://github.com/hanbin973/grgl.git
+[submodule "grapp"]
+	path = grapp
+	url = https://github.com/aprilweilab/grapp.git

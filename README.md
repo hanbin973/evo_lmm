@@ -27,17 +27,28 @@ E[beta_j^2 | G_j]
 
 The implementation will form the corresponding frequency-weighted genetic
 relatedness matrix, estimate its variance components by REML, and produce
-genetic-value predictions with BLUP. The parameters have direct evolutionary
-interpretations: `sigma_a^2 / W_S` controls selection-induced frequency
-dependence, `sigma_b^2` is the focal-trait effect scale, and `rho_ab^2`
-controls coupling between the focal and selected traits.
+genetic-value predictions with BLUP. It supports two nested model families,
+where `q_j = x_hat_j (1 - x_hat_j)`:
+
+| Model | SNP-effect variance | Free parameters |
+| --- | --- | --- |
+| Simplified evolutionary model | `sigma_b^2 / (1 + 2 * tau * q_j)` | `sigma_b^2`, `tau` |
+| Full evolutionary model | `sigma_b^2 * (1 - rho_ab^2 * (2 * tau * q_j) / (1 + 2 * tau * q_j))` | `sigma_b^2`, `rho_ab`, `tau` |
+
+Here `tau = sigma_a^2 / W_S` is the selection-frequency aggregate,
+`sigma_b^2` is the focal-trait effect scale, and `rho_ab` controls coupling
+between the focal and selected traits. The simplified model is the exact
+`rho_ab^2 = 1` specialization of the full model; it has two estimable
+parameters because the coupling is fixed rather than separately estimated.
 
 ## Repository layout
 
 ```text
 .
 ├── grgl/       Git submodule: native GRGL library and its Python package
+├── grapp/      Git submodule: reference GRGL-backed BOLT-LMM implementation
 ├── notes/      Scientific specification for the evolutionary model
+├── plan/       Concrete implementation plans
 ├── main.py     Temporary command-line entry point
 ├── pyproject.toml
 └── AGENTS.md   Development conventions and model invariants
@@ -69,9 +80,10 @@ git submodule update --init --recursive
 uv sync
 ```
 
-`uv` installs the submodule's Python distribution, `pygrgl`, as an editable
-local dependency. This means edits inside `grgl/` take effect on the next
-`uv run` invocation (the native extension is rebuilt when its sources change).
+`uv` installs the GRGL submodule's Python distribution, `pygrgl`, as an
+editable local dependency. GRAPP is currently pinned as reference code for the
+evolutionary BOLT-LMM implementation plan; it will become an editable project
+dependency when that implementation is scaffolded.
 
 Verify the setup with:
 

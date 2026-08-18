@@ -13,6 +13,8 @@ the model parameters.
 | --- | --- |
 | `notes/` | Scientific specification; do not edit unless explicitly asked. |
 | `grgl/` | Git submodule for GRGL and `pygrgl`; treat as an external dependency. |
+| `grapp/` | Git submodule containing the reference GRGL-backed BOLT-LMM implementation. |
+| `plan/` | Reviewed implementation plans and design decisions. |
 | `main.py` | Command-line entry point while the application surface is small. |
 | `pyproject.toml` / `uv.lock` | Python project metadata and reproducible dependency lock. |
 
@@ -32,6 +34,9 @@ parallel module layout.
 - Do not edit files in `grgl/` as part of evo-lmm work. If GRGL needs a change,
   make it in the submodule repository and update this repository's recorded
   submodule commit deliberately.
+- Treat `grapp/` as read-only reference code. Implement evo-lmm-specific prior,
+  operator, fitting, and testing code in this repository; update the submodule
+  commit deliberately when adopting upstream changes.
 
 ## Model invariants
 
@@ -40,16 +45,28 @@ parallel module layout.
 - Frequencies are sample allele frequencies `x_hat_j`; define genotype dosage,
   ploidy, centering, and treatment of monomorphic variants explicitly at every
   public data boundary.
-- Implement the main-text conditional variance as
+- Expose two explicitly named conditional-variance models. Let
+  `q_j = x_hat_j * (1 - x_hat_j)` and `tau = sigma_a^2 / W_S`.
 
-  ```text
-  v_j = sigma_b^2 * (1 - rho_ab^2 *
-        (2 * (sigma_a^2 / W_S) * x_hat_j * (1 - x_hat_j)) /
-        (1 + 2 * (sigma_a^2 / W_S) * x_hat_j * (1 - x_hat_j))).
-  ```
+  - The **simplified evolutionary model** fixes `rho_ab^2 = 1` and uses the
+    two-parameter form
 
-  Keep `sigma_a^2 / W_S`, `sigma_b^2`, and (when identifiable) `rho_ab^2`
-  explicit and non-negative. Constrain `rho_ab^2` to `[0, 1]`.
+    ```text
+    v_j = sigma_b^2 / (1 + 2 * tau * q_j).
+    ```
+
+  - The **full evolutionary model** estimates the coupling and uses the
+    three-parameter form
+
+    ```text
+    v_j = sigma_b^2 * (1 - rho_ab^2 *
+          (2 * tau * q_j) / (1 + 2 * tau * q_j)).
+    ```
+
+  Do not describe the simplified model as a free reparameterization of the
+  full model: it is its exact `rho_ab^2 = 1` specialization. Keep `tau` and
+  `sigma_b^2` non-negative, and constrain the full-model `rho_ab^2` to
+  `[0, 1]`.
 - The weighted GRM must be symmetric positive semidefinite up to numerical
   tolerance. Validate this property in unit tests.
 - Use stable parameterizations for optimization (for example log-scales for
@@ -68,15 +85,16 @@ parallel module layout.
 - Give public functions typed signatures and document units, shapes, and
   parameter constraints.
 - Add deterministic unit tests for frequency weights, boundary frequencies,
-  GRM symmetry/PSD, and likelihood behavior. Use a small seeded simulation for
-  each end-to-end test.
+  GRM symmetry/PSD, and likelihood behavior for both model families. Test that
+  the full model with `rho_ab^2 = 1` agrees exactly with the simplified model.
+  Use a small seeded simulation for each end-to-end test.
 - Before handing off changes, run the smallest relevant test suite plus
   `uv run python -c "import pygrgl"` when dependency configuration changes.
 
 ## Git hygiene
 
-- Preserve the `grgl` gitlink and `.gitmodules`; never commit GRGL build
-  products or vendor a second GRGL copy.
+- Preserve the `grgl` and `grapp` gitlinks and `.gitmodules`; never commit
+  submodule build products or vendor a second copy of either dependency.
 - Commit source, tests, documentation, and the updated `uv.lock` together when
   dependencies change.
 - Keep generated simulation outputs out of the repository unless they are a
