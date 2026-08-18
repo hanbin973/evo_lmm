@@ -68,7 +68,10 @@ The useful source anchors are:
 | One-dimensional variance fit | `grapp/grapp/assoc/bolt_inf_core.py:942` |
 | LOCO calibration | `grapp/grapp/assoc/bolt_inf_core.py:1195` |
 | Association statistics | `grapp/grapp/assoc/bolt_inf_core.py:1573` |
+| Raw CPU `X`, `X^T`, and `X X^T` | `grapp/grapp/linalg/ops_scipy.py:133` |
+| Raw GPU `X`, `X^T`, and `X X^T` | `grapp/grapp/linalg/ops_cupy.py:190` |
 | CPU standardized GRG scaling | `grapp/grapp/linalg/ops_scipy.py:338` |
+| Raw/standardized operator dispatch | `grapp/grapp/grg_calculator.py:21` |
 | Existing BOLT regression test | `grapp/test/assoc/test_bolt_lmm.py:48` |
 
 ### 2.2 Conventional prior represented by GRAPP
@@ -99,6 +102,9 @@ Reuse these behaviors, either through a pinned compatibility adapter or a
 small extraction into first-party evo-lmm code:
 
 - `GRGCalcInterface`, schedulers, and NumPy/CuPy backend selection.
+- Existing raw-dosage operators selected with
+  `get_operator("X", standardized=False)` and
+  `get_multi_operator("X", standardized=False)`.
 - GRG allele-count/frequency traversals.
 - `CovariateBasis` and projection semantics.
 - Batched conjugate-gradient solves.
@@ -109,13 +115,32 @@ small extraction into first-party evo-lmm code:
 Do not modify files inside the submodule. GRAPP's BOLT symbols are internal,
 so pin its commit and isolate all imports in one `grapp_backend.py` module.
 
+GRAPP already provides the unnormalized primitive needed by the evolutionary
+kernel. `SciPyXOperator` and `CuPyXOperator` apply raw diploid dosage `X` or
+`X^T`; their multi-GRG counterparts concatenate or sum chromosome operations.
+They support mutation and sample filters, and accept per-mutation imputation
+values for missing genotypes. They do not center columns or insert
+variant-specific prior weights, which is appropriate: evo-lmm will perform
+covariate projection outside the operator and place the weights between the
+`X^T` and `X` passes.
+
+The current operator table has no CPU multi-GRG unstandardized `X X^T`, while
+the GPU table does. This is not a blocker because the weighted kernel cannot be
+expressed by the unweighted `X X^T` operator anyway. Compose raw multi-`X`, or
+prefer per-chromosome raw `X` operators and sum their results. The latter also
+provides LOCO without relying on `set_exclude`, which the raw multi-`X`
+operators currently lack.
+
 ### 2.4 Required architectural changes
 
 The evolutionary model is not obtained by substituting `v_j` for GRAPP's
 `custom_variance` while leaving the rest of the algorithm unchanged.
 
-First, the notes define `beta_j` on raw diploid dosage. If `A` is the centered
-raw-dosage matrix, the evolutionary covariance is
+First, the notes define `beta_j` on raw diploid dosage. Let `X` be GRAPP's raw
+diploid-dosage operator and let `P_C` be the orthogonal projector off the
+covariate basis, including the intercept. Then `A = P_C X` is the
+covariate-residualized raw-dosage matrix and the evolutionary covariance on the
+restricted subspace is
 
 ```text
 K(theta) = A * diag(w(theta)) * A^T,
@@ -135,11 +160,11 @@ roles:
 
 Those roles coincide under the conventional iid standardized-effect prior but
 not under the evolutionary raw-effect prior. The implementation must hold two
-operator families:
+logical operator families, both built from existing GRAPP primitives:
 
 ```text
-B_theta = centered(A) * diag(sqrt(w(theta)))  # model/covariance operator
-T       = BOLT-normalized centered(A)         # tested-genotype operator
+B_theta = P_C X * diag(sqrt(w(theta)))  # raw prior-weighted model operator
+T       = BOLT-normalized P_C X         # tested-genotype operator
 ```
 
 Use `B_theta` for `K` matvecs, genetic probes, kernel traces, and REML
@@ -249,20 +274,33 @@ test_column(chrom, local_idx)
 kernel_trace(theta, exclude_chrom=None)
 ```
 
-For each chromosome, cache frequencies, `q_j`, centered raw-column norms, test
-normalization, model-variant masks, and raw GRG operators. Recompute only the
-length-`M` weights when parameters change; never materialize `N x M` dosage.
+For each chromosome, construct GRAPP's existing raw operator with
+`get_operator("X", standardized=False)` and cache frequencies, `q_j`, centered
+raw-column norms, test normalization, model-variant masks, and missing-value
+imputation inputs. Recompute only the length-`M` weights when parameters
+change; never materialize `N x M` dosage.
 
-The kernel and derivative matvecs use two GRG passes:
+The kernel and derivative matvecs use two raw GRG passes with projection on
+both sides:
 
 ```text
-K u       = A [w       * (A^T u)]
-dK_k u    = A [dw_k    * (A^T u)].
+u_p       = P_C u
+s         = X^T u_p
+K u       = P_C X [w    * s]
+dK_k u    = P_C X [dw_k * s].
 ```
 
-This is preferable to encoding inverse effect variances through
-`custom_variance`: it keeps the raw-effect units visible, supports analytic
-derivatives, and avoids confusing genotype standardization with prior variance.
+Use a per-chromosome raw `X` operator as the initial implementation. A
+whole-genome matvec sums chromosome results; a LOCO matvec skips the excluded
+chromosome. A future batched implementation may use raw multi-`X`, but it must
+add an exclusion mechanism or maintain one multi-operator per LOCO set.
+
+This direct use of GRAPP's unnormalized matvec is preferable to encoding
+inverse effect variances through `custom_variance`: it keeps the raw-effect
+units visible, supports analytic derivatives, and avoids confusing genotype
+standardization with prior variance. The unweighted raw `X X^T` operator is
+not sufficient because the evolutionary kernel needs `diag(w)` between the
+two passes.
 
 ### 5.2 Restricted likelihood
 
@@ -362,9 +400,11 @@ tolerance; full `r=1` equals simplified for weights, kernels, and likelihood.
 
 ### Phase 2 - GRG weighted operators
 
-- Implement raw centered `A`, weighted `B_theta`, derivative-kernel, and test
-  operators for NumPy/CPU.
-- Implement LOCO exclusion without marker-count renormalization.
+- Wrap GRAPP's `get_operator("X", standardized=False)` per chromosome and
+  implement projected raw `X`, weighted `B_theta`, derivative-kernel, and test
+  operations for NumPy/CPU.
+- Implement whole-genome and LOCO products by summing per-chromosome raw
+  operator results, without marker-count renormalization.
 - Compare every matvec with the dense oracle on small GRGs.
 
 Gate: `A`, `A^T`, `K`, each `dK`, test columns, model scores, test scores, and
