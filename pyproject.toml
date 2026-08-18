@@ -1,0 +1,18 @@
+[project]
+name = "fast-lmm"
+version = "0.1.0"
+description = "Evolutionary random-effects linear mixed models backed by genotype representation graphs"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "msprime>=1.4.2",
+    "numpy>=2.0",
+    "pygrgl",
+    "scipy>=1.14",
+    "tskit>=1.0.3",
+]
+
+[tool.uv.sources]
+# The Python distribution supplied by the grgl submodule is named ``pygrgl``.
+# Keep it editable so changes to the checked-out submodule are used locally.
+pygrgl = { path = "grgl", editable = true }
