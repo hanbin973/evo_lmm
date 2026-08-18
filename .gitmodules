@@ -3,4 +3,4 @@
 	url = https://github.com/hanbin973/grgl.git
 [submodule "grapp"]
 	path = grapp
-	url = https://github.com/aprilweilab/grapp.git
+	url = https://github.com/hanbin973/grapp.git
