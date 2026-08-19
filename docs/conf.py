@@ -18,12 +18,15 @@ extensions = [
     "sphinx.ext.napoleon",
     "matplotlib.sphinxext.plot_directive",
     "sphinx_design",
+    "sphinxcontrib.bibtex",
 ]
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**.ipynb_checkpoints"]
 autodoc_member_order = "bysource"
 autodoc_typehints = "description"
+bibtex_bibfiles = ["references.bib"]
+bibtex_reference_style = "author_year"
 
 html_theme = "pydata_sphinx_theme"
 html_static_path = ["_static"]

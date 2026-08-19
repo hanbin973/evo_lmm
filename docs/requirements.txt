@@ -3,3 +3,4 @@ sphinx
 pydata-sphinx-theme
 matplotlib
 sphinx-design
+sphinxcontrib-bibtex

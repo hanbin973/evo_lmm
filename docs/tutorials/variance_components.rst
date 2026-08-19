@@ -9,7 +9,8 @@ the horizontal line in each panel is the generating value.
 
 The example uses a broad, fixed allele-frequency spectrum so that the
 frequency-dependent ``tau`` parameter is visible in a modest simulation. The
-same fitting call can consume a GRG through the matrix-free BOLT-style API;
+same fitting call can consume a genotype representation graph (GRG)
+:cite:p:`DeHaasPanWei2025` through the matrix-free BOLT-style API;
 the dense construction here keeps the ten-replicate tutorial quick and makes
 the simulation boundary easy to inspect.
 

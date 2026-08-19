@@ -15,6 +15,7 @@ organization used by `GRGL <https://grgl.readthedocs.io/en/latest/>`_ and
    howto/index
    tutorials/index
    reference/index
+   references
 
 The model keeps the focal-trait effect ``beta_j`` distinct from the latent
 selected-trait effect ``alpha_j``. Frequencies are sample allele frequencies,

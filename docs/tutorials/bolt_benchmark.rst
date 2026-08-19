@@ -2,7 +2,7 @@ Benchmark against GRAPP BOLT-LMM
 ================================
 
 This tutorial compares the GRG-backed evolutionary model with GRAPP's
-``bolt_lmm_inf`` on the forward-simulated populations from
+``bolt_lmm_inf`` :cite:p:`DeHaasAdonizioPanWei2026` on the forward-simulated populations from
 :doc:`slim_forward_simplified`. It asks whether the evolutionary model
 reproduces the distribution of genic variance across allele frequencies, and
 how much fitting time it requires on the same GRG-backed data.
@@ -19,7 +19,9 @@ The ten deterministic replicates (seeds ``812``--``821``) are shared between
 the two tutorials. Each has its own phenotype and full GRG. For fitting, the
 tree sequence is split into two blocks so that GRAPP's leave-one-chromosome-out
 calibration has a block to leave out. Both blocks retain all 2,000 individuals
-and include coalescent counts for GRAPP's ``XTX`` traversal.
+and use the Genotype Representation Graph data structure
+:cite:p:`DeHaasPanWei2025`, including coalescent counts for GRAPP's ``XTX``
+traversal.
 
 Timings cover fitting only: operator setup, variance-component estimation, and
 each method's calibration or trace work. They exclude the shared SLiM run,

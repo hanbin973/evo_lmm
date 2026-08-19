@@ -6,7 +6,7 @@ simplified evolutionary model, then fits evo-lmm to the sampled genotypes and
 phenotypes. Its purpose is to check the model in the setting from which its
 frequency-dependent prior is derived: mutation, drift, recombination, and
 stabilizing selection jointly determine which variants are segregating and
-their effects.
+their effects :cite:p:`LeeTerhorst2026`.
 
 It is tempting to draw variant effects from the final conditional prior,
 simulate ``y = G beta + e``, and fit the same model back to those data. That is
@@ -20,10 +20,8 @@ simulation assumes this relationship rather than generating it, and omits the
 finite-population and linkage effects that accompany it. Forward simulation
 therefore provides the appropriate end-to-end experiment.
 
-The SLiM model is adapted from the paper repository's
-`burn-in script <https://github.com/hanbin973/param_arch_stab_paper/blob/main/codes/scripts/burnin.slim>`_
-and `replicate script <https://github.com/hanbin973/param_arch_stab_paper/blob/main/codes/scripts/main.slim>`_.
-Mutations have normally distributed latent effects, fitness is
+The SLiM model follows the forward-simulation design described in
+:cite:p:`LeeTerhorst2026`. Mutations have normally distributed latent effects, fitness is
 ``exp(-phenotype^2 / (2 * V_S))``, and ``W_S = V_S / (2N)`` is the
 dimensionless selection-width parameter. This tutorial uses the simplified
 ``rho^2 = 1`` case, for which the focal and selected effects agree:
@@ -67,9 +65,11 @@ SLiM to GRG to evo-lmm
 For each replicate, the driver simplifies the extant samples with ``tskit``,
 converts the tree sequence with ``pygrgl.grg_from_trees``, computes sample
 allele frequencies, and uses the raw GRG dosage operator to form genetic
-values from the metadata-derived effects. It then adds residual noise and fits
-the simplified model. Simplification is needed because SLiM's recording also
-marks historical nodes as samples.
+values from the metadata-derived effects. The GRG is a compact, lossless
+representation that supports these graph-native operations
+:cite:p:`DeHaasPanWei2025`. The driver then adds residual noise and fits the
+simplified model. Simplification is needed because SLiM's recording also marks
+historical nodes as samples.
 
 .. dropdown:: Show the Python driver
    :color: light
