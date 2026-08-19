@@ -1,3 +1,5 @@
+[![Documentation Status](https://readthedocs.org/projects/evo-lmm/badge/?version=latest)](https://evo-lmm.readthedocs.io/en/latest/)
+
 # evo-lmm
 
 `evo-lmm` is a Python implementation of the evolutionary random-effects
