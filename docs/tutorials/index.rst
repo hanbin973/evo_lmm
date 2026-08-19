@@ -8,3 +8,4 @@ so that the figures and estimates can be compared across runs.
    :maxdepth: 2
 
    variance_components
+   slim_forward_simplified

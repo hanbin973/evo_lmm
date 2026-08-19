@@ -1,0 +1,50 @@
+// Explicit forward simulation for the simplified evolutionary prior.
+//
+// This follows the m2/stabilizing-selection construction in:
+// https://github.com/hanbin973/param_arch_stab_paper/blob/main/codes/scripts/burnin.slim
+// and main.slim. Here m2 selection coefficients are the latent alpha effects.
+// The simplified rho^2 = 1 specialization sets beta = alpha in Python.
+
+initialize() {
+    if (!exists("N")) defineConstant("N", 1000);
+    if (!exists("L")) defineConstant("L", 100000);
+    if (!exists("MUT_RATE")) defineConstant("MUT_RATE", 1e-7);
+    if (!exists("REC_RATE")) defineConstant("REC_RATE", 1e-8);
+    if (!exists("SIGMA_A")) defineConstant("SIGMA_A", 1.0);
+    // V_S is the fitness-landscape width. W_S = V_S / (2N) is the
+    // dimensionless width used after diffusion-time rescaling.
+    if (!exists("V_S")) defineConstant("V_S", 2.0 * N);
+    if (!exists("W_S")) defineConstant("W_S", V_S / (2.0 * N));
+    if (!exists("BURN_IN")) defineConstant("BURN_IN", 4 * N);
+    if (!exists("OUTPUT_FILE")) defineConstant("OUTPUT_FILE", "slim_forward.trees");
+
+    initializeTreeSeq();
+    initializeMutationType("m2", 0.5, "n", 0.0, SIGMA_A);
+    initializeGenomicElementType("g1", m2, 1.0);
+    initializeGenomicElement(g1, 0, L - 1);
+    initializeMutationRate(MUT_RATE);
+    initializeRecombinationRate(REC_RATE);
+}
+
+1 early() {
+    sim.addSubpop("p1", N);
+    // The population mean is centered at the start, as in burnin.slim.
+    defineConstant("INITIAL_MEAN", 0.0);
+}
+
+mutationEffect(m2) {
+    // m2 coefficients are trait effects, not direct mutation fitness effects.
+    return 1.0;
+}
+
+fitnessEffect() {
+    phenotype = individual.sumOfMutationsOfType(m2) - INITIAL_MEAN;
+    return exp(-1.0 * phenotype^2 / (2.0 * V_S));
+}
+
+BURN_IN late() {
+    muts = sim.mutationsOfType(m2);
+    sim.treeSeqOutput(OUTPUT_FILE);
+    catn("Forward simulation complete: " + size(muts) + " m2 mutations");
+    sim.simulationFinished();
+}
