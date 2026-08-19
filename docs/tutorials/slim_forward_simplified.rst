@@ -44,7 +44,7 @@ The forward model
 -----------------
 
 The simulation fixes a diploid population of 2,000 individuals, runs for
-``4N = 8,000`` generations across ``L = 10^6`` bases, and records a tree
+``10N = 20,000`` generations across ``L = 10^6`` bases, and records a tree
 sequence. It uses ``V_S = 2N = 4,000``, hence ``W_S = 1``. The complete SLiM
 source is included in the following expandable block.
 

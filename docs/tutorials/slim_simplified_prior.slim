@@ -15,7 +15,7 @@ initialize() {
     // dimensionless width used after diffusion-time rescaling.
     if (!exists("V_S")) defineConstant("V_S", 2.0 * N);
     if (!exists("W_S")) defineConstant("W_S", V_S / (2.0 * N));
-    if (!exists("BURN_IN")) defineConstant("BURN_IN", 4 * N);
+    if (!exists("BURN_IN")) defineConstant("BURN_IN", 10 * N);
     if (!exists("OUTPUT_FILE")) defineConstant("OUTPUT_FILE", "slim_forward.trees");
 
     initializeTreeSeq();

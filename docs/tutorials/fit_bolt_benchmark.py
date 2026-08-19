@@ -17,9 +17,9 @@ if str(_TUTORIAL_DIRECTORY) not in sys.path:
 
 from bolt_benchmark import (  # noqa: E402
     SEED,
-    load_simulation_replicates,
     run_benchmark,
 )
+from slim_forward_simplified import load_simulation_replicates  # noqa: E402
 
 
 DATA_DIRECTORY = Path("docs/_artifacts/bolt_seed_812")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+import json
 from pathlib import Path
 import subprocess
 import tempfile
@@ -21,7 +22,7 @@ from evo_lmm import (
 
 
 N_INDIVIDUALS = 2_000
-N_GENERATIONS = 4 * N_INDIVIDUALS
+N_GENERATIONS = 10 * N_INDIVIDUALS
 N_REPLICATES = 10
 SEQUENCE_LENGTH = 1_000_000
 SIGMA_A2 = 1.0
@@ -30,6 +31,19 @@ W_S = V_S / (2.0 * N_INDIVIDUALS)
 TRUE_TAU = SIGMA_A2 / W_S
 RESIDUAL_VARIANCE = 0.4
 SEED = 812
+
+
+def _simulation_manifest(seed: int) -> dict[str, int | float]:
+    """Return the configuration that defines a persisted forward replicate."""
+
+    return {
+        "seed": int(seed),
+        "individuals": N_INDIVIDUALS,
+        "generations": N_GENERATIONS,
+        "sequence_length": SEQUENCE_LENGTH,
+        "sigma_a2": SIGMA_A2,
+        "residual_variance": RESIDUAL_VARIANCE,
+    }
 
 
 def run_slim(output_directory: Path, seed: int = SEED) -> Path:
@@ -99,12 +113,23 @@ def _load_or_simulate_data(seed: int, output_directory: Path) -> dict:
         output_directory / "frequencies.npy",
         output_directory / "phenotype.npy",
         output_directory / "seed.txt",
+        output_directory / "simulation.json",
     )
     try:
         recorded_seed = int((output_directory / "seed.txt").read_text(encoding="utf-8"))
     except (FileNotFoundError, ValueError):
         recorded_seed = None
-    if recorded_seed != int(seed) or not all(path.exists() for path in required):
+    try:
+        recorded_manifest = json.loads(
+            (output_directory / "simulation.json").read_text(encoding="utf-8")
+        )
+    except (FileNotFoundError, ValueError, json.JSONDecodeError):
+        recorded_manifest = None
+    if (
+        recorded_seed != int(seed)
+        or recorded_manifest != _simulation_manifest(seed)
+        or not all(path.exists() for path in required)
+    ):
         tree_path = run_slim(output_directory, seed)
         recorded = tskit.load(str(tree_path))
         alpha = mutation_effects(recorded)
@@ -135,6 +160,10 @@ def _load_or_simulate_data(seed: int, output_directory: Path) -> dict:
         np.save(output_directory / "frequencies.npy", frequencies)
         np.save(output_directory / "phenotype.npy", phenotype)
         (output_directory / "seed.txt").write_text(f"{seed}\n", encoding="utf-8")
+        (output_directory / "simulation.json").write_text(
+            json.dumps(_simulation_manifest(seed), sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
     else:
         tree_sequence = tskit.load(str(simplified_path))
         grg = pygrgl.grg_from_trees(str(simplified_path))
