@@ -9,3 +9,4 @@ so that the figures and estimates can be compared across runs.
 
    variance_components
    slim_forward_simplified
+   bolt_benchmark

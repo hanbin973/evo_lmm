@@ -2,8 +2,9 @@
 __pycache__/
 *.py[oc]
 .DS_Store
-build/
-_build/
+# Build outputs at the repository root and in nested projects/docs folders.
+**/build/
+**/_build/
 dist/
 wheels/
 *.egg-info
