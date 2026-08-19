@@ -12,14 +12,17 @@ It reuses the simulation source and configured parameters from
 * ``sigma_a^2 = sigma_b^2 = 1`` and the simplified ``rho^2 = 1`` model; and
 * residual variance ``sigma_e^2 = 0.4``.
 
-The benchmark uses seed ``812`` and creates one phenotype from the full GRG.
-For the fits, the same tree sequence is divided into two physical blocks.
+The benchmark reuses the ten deterministic forward replicates (seeds
+``812``--``821``) generated for :doc:`slim_forward_simplified`. Each replicate
+has its own phenotype and full GRG. For the fits, each tree sequence is divided
+into two physical blocks.
 This is an implementation detail required by GRAPP's leave-one-chromosome-out
 calibration: with only one block, there is no chromosome left out of the
 calibration set. Both blocks retain all 2,000 individuals and their GRGs are
 created with coalescent counts enabled for GRAPP's ``XTX`` traversal.
 
-The reported timings cover the fitting calls only. They include each method's
+The reported timings cover the fitting calls only and are aggregated across the
+ten replicates. They include each method's
 operator setup, variance-component estimation, and method-specific calibration
 or trace work, but exclude the shared SLiM simulation, tskit simplification,
 and GRG conversion. The exact seconds are machine-dependent and are printed
@@ -122,51 +125,46 @@ markers (``sigma_g2/M`` per marker). In raw-dosage effect notation this is
 therefore a neutral frequency-independent reference. evo-lmm instead uses the
 frequency-dependent simplified prior
 ``sigma_b^2/(1 + 2*tau*x*(1-x))``.
+Each plotted point is the mean across the ten forward replicates, with an error
+bar showing the sample standard deviation. The runtime annotation uses the
+same mean-plus-standard-deviation convention.
 
 .. literalinclude:: bolt_benchmark.py
    :language: python
    :linenos:
 
-Prepare the simulation and GRG artifacts once from the repository root with:
+Prepare the ten forward simulation and GRG artifacts once from the repository root with:
 
 .. code-block:: console
 
    uv run python docs/tutorials/prepare_bolt_benchmark.py
 
-Then rerun only the LMM fitting comparison as often as needed with:
+Then rerun only the ten-replicate LMM fitting comparison as often as needed with:
 
 .. code-block:: console
 
    uv run python docs/tutorials/fit_bolt_benchmark.py
 
 The prepared files are stored under ``docs/_artifacts/`` (ignored by Git).
-Running ``bolt_benchmark.py`` or the figure generator automatically reuses
-that directory when it exists; otherwise it falls back to a temporary
-simulation.
+Running ``bolt_benchmark.py`` or the figure generator automatically reuses the
+ten forward directories when they exist; it does not rerun SLiM. The fit-only
+script prints per-replicate estimates and the mean and sample standard
+deviation of both runtimes.
 
-The fit-only rerun with the optimized Hutchinson default reported:
+The current ten-replicate fit run reports:
 
 .. list-table::
    :header-rows: 1
 
    * - Method
-     - Fit seconds
-     - sigma_b2
-     - tau
-     - sigma_e2
+     - Mean fit seconds
+     - Sample SD seconds
    * - evo-lmm (warm Hutchinson, 15 vectors)
-     - 25.536
-     - 0.965676
-     - 1.615329
-     - 0.388117
+     - 27.06
+     - 6.77
    * - GRAPP BOLT-LMM
-     - 10.708
-     - 38.614655 (sigma_g2)
-     - n/a
-     - n/a
-
-This is a 2.45x evo-lmm speedup over the earlier cold-start profile on the
-same workload; GRAPP remains 2.38x faster in absolute fit time.
+     - 11.74
+     - 1.77
 
 The figure is pre-generated locally so ReadTheDocs does not rerun SLiM, GRG
 conversion, or either fitted model. Regenerate it with

@@ -87,27 +87,40 @@ def mutation_effects(tree_sequence: tskit.TreeSequence) -> np.ndarray:
     return np.asarray(effects, dtype=np.float64)
 
 
-def simulate_and_fit(seed: int = SEED):
-    """Run SLiM, convert its tree sequence to a GRG, and fit the prior."""
+def _load_or_simulate_data(seed: int, output_directory: Path) -> dict:
+    """Load one persisted simulation or create it in ``output_directory``."""
 
-    with tempfile.TemporaryDirectory(prefix="evo_lmm_slim_") as directory:
-        tree_path = run_slim(Path(directory), seed)
-        tree_sequence = tskit.load(str(tree_path))
-        alpha = mutation_effects(tree_sequence)
+    output_directory = Path(output_directory).resolve()
+    output_directory.mkdir(parents=True, exist_ok=True)
+    simplified_path = output_directory / "slim_forward.simplified.trees"
+    required = (
+        simplified_path,
+        output_directory / "alpha.npy",
+        output_directory / "frequencies.npy",
+        output_directory / "phenotype.npy",
+        output_directory / "seed.txt",
+    )
+    try:
+        recorded_seed = int((output_directory / "seed.txt").read_text(encoding="utf-8"))
+    except (FileNotFoundError, ValueError):
+        recorded_seed = None
+    if recorded_seed != int(seed) or not all(path.exists() for path in required):
+        tree_path = run_slim(output_directory, seed)
+        recorded = tskit.load(str(tree_path))
+        alpha = mutation_effects(recorded)
         # SLiM marks historical nodes as samples in its full recording. GRGL
         # expects the current haploid genomes to be the leaf samples, so use
         # ordinary tskit simplification before conversion. This is not PySLiM
         # annotation and preserves mutation order with filter_sites=False.
-        grg_tree_path = Path(directory) / "slim_forward.simplified.trees"
-        tree_sequence.simplify(filter_sites=False).dump(str(grg_tree_path))
-        grg = pygrgl.grg_from_trees(str(grg_tree_path))
+        tree_sequence = recorded.simplify(filter_sites=False)
+        tree_sequence.dump(str(simplified_path))
+        grg = pygrgl.grg_from_trees(str(simplified_path))
         frequencies = sample_allele_frequencies(grg)
         if alpha.size != grg.num_mutations:
             raise ValueError(
                 "SLiM effect order does not match GRG mutation order: "
                 f"{alpha.size} effects for {grg.num_mutations} mutations"
             )
-
         prior = SimplifiedPrior(sigma_b2=SIGMA_A2, tau=TRUE_TAU)
         ops = EvolutionaryLmmOps(grg, frequencies=frequencies, model="simplified")
         # rho^2 = 1: the focal effect beta is the selected-trait effect alpha.
@@ -118,40 +131,127 @@ def simulate_and_fit(seed: int = SEED):
             np.sqrt(RESIDUAL_VARIANCE),
             size=ops.n,
         )
-        fit = fit_evolutionary_bolt_lmm(
-            [("slim", grg)],
-            phenotype,
-            frequencies={"slim": frequencies},
-            model="simplified",
-            initial=prior,
-            trace_probes=64,
-            max_iter=30,
-            cg_tol=1e-8,
-            seed=seed + 2,
-        )
-        return {
-            "tree_sequence": tree_sequence,
-            "grg": grg,
-            "frequencies": frequencies,
-            "alpha": alpha,
-            "phenotype": phenotype,
-            "fit": fit,
-        }
+        np.save(output_directory / "alpha.npy", alpha)
+        np.save(output_directory / "frequencies.npy", frequencies)
+        np.save(output_directory / "phenotype.npy", phenotype)
+        (output_directory / "seed.txt").write_text(f"{seed}\n", encoding="utf-8")
+    else:
+        tree_sequence = tskit.load(str(simplified_path))
+        grg = pygrgl.grg_from_trees(str(simplified_path))
+        alpha = np.load(output_directory / "alpha.npy")
+        frequencies = np.load(output_directory / "frequencies.npy")
+        phenotype = np.load(output_directory / "phenotype.npy")
+        if alpha.size != grg.num_mutations:
+            raise ValueError(
+                "persisted SLiM effect order does not match GRG mutation order: "
+                f"{alpha.size} effects for {grg.num_mutations} mutations"
+            )
+    if frequencies.shape != (grg.num_mutations,):
+        raise ValueError("persisted frequency vector does not match GRG mutations")
+    return {
+        "seed": int(seed),
+        "tree_sequence": tree_sequence,
+        "grg": grg,
+        "frequencies": frequencies,
+        "alpha": alpha,
+        "phenotype": phenotype,
+    }
 
 
-def run_replicates(workers: int = 1) -> list[dict]:
-    """Run independent SLiM replicates with deterministic seeds.
+def _fit_forward_data(data: dict) -> dict:
+    """Fit the tutorial model to one already prepared simulation."""
+
+    seed = int(data["seed"])
+    prior = SimplifiedPrior(sigma_b2=SIGMA_A2, tau=TRUE_TAU)
+    fit = fit_evolutionary_bolt_lmm(
+        [("slim", data["grg"])],
+        data["phenotype"],
+        frequencies={"slim": data["frequencies"]},
+        model="simplified",
+        initial=prior,
+        trace_probes=64,
+        max_iter=30,
+        cg_tol=1e-8,
+        seed=seed + 2,
+    )
+    return {**data, "fit": fit}
+
+
+def simulate_and_fit(seed: int = SEED, *, output_directory: Path | None = None):
+    """Run or load one SLiM data set, convert it to a GRG, and fit the prior."""
+
+    if output_directory is not None:
+        return _fit_forward_data(_load_or_simulate_data(seed, output_directory))
+    with tempfile.TemporaryDirectory(prefix="evo_lmm_slim_") as directory:
+        return _fit_forward_data(_load_or_simulate_data(seed, Path(directory)))
+
+
+def prepare_replicates(
+    workers: int = 1,
+    *,
+    artifact_directory: Path,
+) -> list[dict]:
+    """Run or load the ten forward simulations without fitting them."""
+
+    seeds = [SEED + replicate for replicate in range(N_REPLICATES)]
+    artifact_root = Path(artifact_directory).resolve()
+    artifact_root.mkdir(parents=True, exist_ok=True)
+
+    def run(seed: int) -> dict:
+        return _load_or_simulate_data(seed, artifact_root / f"seed_{seed}")
+
+    if workers <= 1:
+        return [run(seed) for seed in seeds]
+    with ThreadPoolExecutor(max_workers=int(workers)) as executor:
+        return list(executor.map(run, seeds))
+
+
+def run_replicates(
+    workers: int = 1,
+    *,
+    artifact_directory: Path | None = None,
+) -> list[dict]:
+    """Run independent SLiM replicates and fit the tutorial prior.
 
     ``workers=1`` preserves the simple sequential tutorial execution. Local
     documentation generation may use a small thread pool because each
-    replicate owns its SLiM process and GRG objects.
+    replicate owns its SLiM process and GRG objects.  When ``artifact_directory``
+    is supplied, the simulation outputs are persisted for the benchmark.
     """
 
-    seeds = [SEED + replicate for replicate in range(N_REPLICATES)]
+    if artifact_directory is None:
+        with tempfile.TemporaryDirectory(prefix="evo_lmm_slim_replicates_") as directory:
+            data = prepare_replicates(workers, artifact_directory=Path(directory))
+            if workers <= 1:
+                return [_fit_forward_data(item) for item in data]
+            with ThreadPoolExecutor(max_workers=int(workers)) as executor:
+                return list(executor.map(_fit_forward_data, data))
+    data = prepare_replicates(workers, artifact_directory=artifact_directory)
     if workers <= 1:
-        return [simulate_and_fit(seed) for seed in seeds]
+        return [_fit_forward_data(item) for item in data]
     with ThreadPoolExecutor(max_workers=int(workers)) as executor:
-        return list(executor.map(simulate_and_fit, seeds))
+        return list(executor.map(_fit_forward_data, data))
+
+
+def load_simulation_replicates(artifact_directory: Path) -> list[dict]:
+    """Load persisted forward simulations without rerunning the tutorial fits."""
+
+    root = Path(artifact_directory).resolve()
+    if not root.exists():
+        raise FileNotFoundError(
+            f"forward artifacts are missing in {root}; run the figure generator first"
+        )
+    missing = [
+        root / f"seed_{SEED + replicate}"
+        for replicate in range(N_REPLICATES)
+        if not (root / f"seed_{SEED + replicate}" / "slim_forward.simplified.trees").exists()
+    ]
+    if missing:
+        raise FileNotFoundError(
+            "forward replicate artifacts are incomplete; missing "
+            + ", ".join(str(path) for path in missing)
+        )
+    return prepare_replicates(workers=1, artifact_directory=root)
 
 
 def local_linear_regression(

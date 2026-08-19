@@ -73,8 +73,8 @@ class BenchmarkData:
 
 
 @dataclass(frozen=True)
-class BenchmarkResult:
-    """Fits, timings, and data needed for the benchmark figure."""
+class BenchmarkReplicateResult:
+    """One fit pair, runtime pair, and data set used in the benchmark."""
 
     seed: int
     data: BenchmarkData
@@ -83,6 +83,64 @@ class BenchmarkResult:
     bolt_stats: list[Any]
     evo_seconds: float
     bolt_seconds: float
+
+
+@dataclass(frozen=True)
+class BenchmarkResult:
+    """Aggregate benchmark result over one or more forward replicates."""
+
+    replicates: tuple[BenchmarkReplicateResult, ...]
+
+    def __post_init__(self) -> None:
+        if not self.replicates:
+            raise ValueError("benchmark requires at least one replicate")
+
+    @property
+    def seed(self) -> int:
+        """Return the first seed for backwards-compatible single-run callers."""
+
+        return self.replicates[0].seed
+
+    @property
+    def data(self) -> BenchmarkData:
+        """Return the first data set for backwards-compatible callers."""
+
+        return self.replicates[0].data
+
+    @property
+    def evo_fit(self) -> Any:
+        return self.replicates[0].evo_fit
+
+    @property
+    def bolt_fit(self) -> Any:
+        return self.replicates[0].bolt_fit
+
+    @property
+    def bolt_stats(self) -> list[Any]:
+        return self.replicates[0].bolt_stats
+
+    @property
+    def evo_seconds(self) -> float:
+        return float(np.mean([result.evo_seconds for result in self.replicates]))
+
+    @property
+    def bolt_seconds(self) -> float:
+        return float(np.mean([result.bolt_seconds for result in self.replicates]))
+
+    @property
+    def n_replicates(self) -> int:
+        return len(self.replicates)
+
+    def runtime_summary(self) -> dict[str, tuple[float, float]]:
+        """Return mean and sample standard deviation of each fit runtime."""
+
+        evo = np.asarray([result.evo_seconds for result in self.replicates])
+        bolt = np.asarray([result.bolt_seconds for result in self.replicates])
+        ddof = 1 if self.n_replicates > 1 else 0
+        return {
+            "evo-lmm": (float(np.mean(evo)), float(np.std(evo, ddof=ddof))),
+            "GRAPP BOLT-LMM": (float(np.mean(bolt)), float(np.std(bolt, ddof=ddof))),
+        }
 
 
 def _split_forward_tree_sequence(
@@ -270,6 +328,56 @@ def load_benchmark_data(output_directory: Path) -> BenchmarkData:
     )
 
 
+def benchmark_data_from_forward_result(
+    forward_result: dict,
+    output_directory: Path,
+) -> BenchmarkData:
+    """Build benchmark blocks from a previously simulated forward replicate.
+
+    ``slim_forward_simplified.run_replicates`` returns the simplified tree
+    sequence, GRG, frequencies, effects, and phenotype used by its two-panel
+    figure.  This adapter reuses those objects and only performs the physical
+    block split needed by GRAPP; it never invokes SLiM.
+    """
+
+    output_directory = Path(output_directory).resolve()
+    output_directory.mkdir(parents=True, exist_ok=True)
+    tree_sequence = forward_result["tree_sequence"]
+    full_grg = forward_result["grg"]
+    full_frequencies = np.asarray(forward_result["frequencies"], dtype=np.float64)
+    alpha = np.asarray(forward_result["alpha"], dtype=np.float64)
+    phenotype = np.asarray(forward_result["phenotype"], dtype=np.float64)
+    if alpha.size != full_grg.num_mutations:
+        raise ValueError(
+            "forward effect order does not match GRG mutation order: "
+            f"{alpha.size} effects for {full_grg.num_mutations} mutations"
+        )
+    blocks = _split_forward_tree_sequence(tree_sequence, output_directory)
+    block_frequencies = {
+        label: sample_allele_frequencies(grg) for label, grg in blocks
+    }
+    bolt_blocks, bolt_block_frequencies = _make_bolt_blocks(
+        blocks,
+        block_frequencies,
+        output_directory,
+    )
+    concatenated_frequencies = np.concatenate(
+        [block_frequencies[label] for label, _ in blocks]
+    )
+    np.testing.assert_allclose(concatenated_frequencies, full_frequencies)
+    return BenchmarkData(
+        tree_sequence=tree_sequence,
+        full_grg=full_grg,
+        full_frequencies=full_frequencies,
+        alpha=alpha,
+        phenotype=phenotype,
+        blocks=blocks,
+        block_frequencies=block_frequencies,
+        bolt_blocks=bolt_blocks,
+        bolt_block_frequencies=bolt_block_frequencies,
+    )
+
+
 def simulate_forward_data(seed: int = SEED) -> BenchmarkData:
     """Run the simulation in a temporary directory for in-process callers."""
 
@@ -277,18 +385,9 @@ def simulate_forward_data(seed: int = SEED) -> BenchmarkData:
         return _build_benchmark_data(Path(directory), seed)
 
 
-def run_benchmark(
-    seed: int = SEED,
-    *,
-    data_directory: Path | None = None,
-) -> BenchmarkResult:
-    """Fit evo-lmm and GRAPP BOLT-LMM and measure their wall-clock runtimes."""
+def _fit_benchmark_data(seed: int, data: BenchmarkData) -> BenchmarkReplicateResult:
+    """Fit both methods for one prepared data set and time only the fits."""
 
-    data = (
-        load_benchmark_data(data_directory)
-        if data_directory is not None
-        else simulate_forward_data(seed)
-    )
     initial = SimplifiedPrior(sigma_b2=SIGMA_A2, tau=TRUE_TAU)
 
     start = time.perf_counter()
@@ -332,7 +431,7 @@ def run_benchmark(
     )
     bolt_seconds = time.perf_counter() - start
 
-    return BenchmarkResult(
+    return BenchmarkReplicateResult(
         seed=seed,
         data=data,
         evo_fit=evo_fit,
@@ -341,6 +440,47 @@ def run_benchmark(
         evo_seconds=evo_seconds,
         bolt_seconds=bolt_seconds,
     )
+
+
+def run_benchmark(
+    seed: int = SEED,
+    *,
+    data_directory: Path | None = None,
+    forward_results: list[dict] | None = None,
+) -> BenchmarkResult:
+    """Fit evo-lmm and GRAPP over one or more prepared replicates.
+
+    ``forward_results`` is the output of the two-panel SLiM tutorial and is
+    preferred for the documentation benchmark: it reuses those simulations
+    and phenotypes while fitting each method with the benchmark's matched
+    numerical budget.  ``data_directory`` remains a single-replicate fallback
+    for the fit-only command and backwards-compatible callers.
+    """
+
+    if forward_results is not None and data_directory is not None:
+        raise ValueError("pass either forward_results or data_directory, not both")
+
+    if forward_results is None:
+        data = (
+            load_benchmark_data(data_directory)
+            if data_directory is not None
+            else simulate_forward_data(seed)
+        )
+        return BenchmarkResult((_fit_benchmark_data(seed, data),))
+
+    if not forward_results:
+        raise ValueError("forward_results must contain at least one replicate")
+    with tempfile.TemporaryDirectory(prefix="evo_lmm_benchmark_blocks_") as directory:
+        root = Path(directory)
+        fitted = []
+        for index, forward_result in enumerate(forward_results):
+            replicate_seed = int(forward_result.get("seed", seed + index))
+            data = benchmark_data_from_forward_result(
+                forward_result,
+                root / f"seed_{replicate_seed}",
+            )
+            fitted.append(_fit_benchmark_data(replicate_seed, data))
+    return BenchmarkResult(tuple(fitted))
 
 
 def _cumulative_by_maf(
@@ -369,7 +509,7 @@ def _cumulative_by_maf(
     return np.where(positions > 0, cumulative[np.maximum(positions - 1, 0)], 0.0)
 
 
-def _bolt_curve(result: BenchmarkResult) -> np.ndarray:
+def _bolt_curve(result: BenchmarkReplicateResult) -> np.ndarray:
     """Return GRAPP's global-GRM cumulative variance allocation.
 
     BOLT-LMM uses a standardized global GRM, so its fitted genetic scale is
@@ -392,62 +532,95 @@ def _bolt_curve(result: BenchmarkResult) -> np.ndarray:
     return _cumulative_by_maf(maf, marker_contribution, eligible=eligible)
 
 
-def make_summary(result: BenchmarkResult) -> plt.Figure:
-    """Make the one-panel Figure-A11-style cumulative variance comparison."""
+def _replicate_curves(result: BenchmarkReplicateResult) -> dict[str, np.ndarray]:
+    """Compute the four cumulative genic-variance curves for one replicate."""
 
     data = result.data
     maf = np.minimum(data.full_frequencies, 1.0 - data.full_frequencies)
     q = data.full_frequencies * (1.0 - data.full_frequencies)
     segregating = q > 0.0
     genic_factor = 2.0 * q
+    configured_prior = SimplifiedPrior(sigma_b2=SIGMA_A2, tau=TRUE_TAU)
+    return {
+        "SLiM realization": _cumulative_by_maf(
+            maf,
+            np.square(data.alpha) * genic_factor,
+            eligible=segregating,
+        ),
+        "configured evolutionary prior": _cumulative_by_maf(
+            maf,
+            configured_prior.effect_variances(data.full_frequencies) * genic_factor,
+            eligible=segregating,
+        ),
+        "evo-lmm fitted prior": _cumulative_by_maf(
+            maf,
+            result.evo_fit.prior.effect_variances(data.full_frequencies) * genic_factor,
+            eligible=segregating,
+        ),
+        "GRAPP BOLT-LMM": _bolt_curve(result),
+    }
 
-    realized = _cumulative_by_maf(
-        maf,
-        np.square(data.alpha) * genic_factor,
-        eligible=segregating,
-    )
-    configured_prior = SimplifiedPrior(
-        sigma_b2=SIGMA_A2,
-        tau=TRUE_TAU,
-    )
-    configured = _cumulative_by_maf(
-        maf,
-        configured_prior.effect_variances(data.full_frequencies) * genic_factor,
-        eligible=segregating,
-    )
-    evo = _cumulative_by_maf(
-        maf,
-        result.evo_fit.prior.effect_variances(data.full_frequencies) * genic_factor,
-        eligible=segregating,
-    )
-    bolt = _bolt_curve(result)
+
+def make_summary(result: BenchmarkResult) -> plt.Figure:
+    """Plot mean cumulative genic variance with replicate variation bars."""
+
+    curve_values = {
+        label: np.stack([_replicate_curves(rep)[label] for rep in result.replicates])
+        for label in (
+            "SLiM realization",
+            "configured evolutionary prior",
+            "evo-lmm fitted prior",
+            "GRAPP BOLT-LMM",
+        )
+    }
+    means = {label: np.mean(values, axis=0) for label, values in curve_values.items()}
+    ddof = 1 if result.n_replicates > 1 else 0
+    variations = {
+        label: np.std(values, axis=0, ddof=ddof)
+        for label, values in curve_values.items()
+    }
 
     figure, axis = plt.subplots(figsize=(6.4, 4.2), constrained_layout=True)
     x = np.arange(MAF_THRESHOLDS.size)
-    axis.plot(x, realized, color="tab:green", marker="o", linewidth=1.8, label="SLiM realization")
-    axis.plot(
+    axis.errorbar(
         x,
-        configured,
+        means["SLiM realization"],
+        yerr=variations["SLiM realization"],
+        color="tab:green",
+        marker="o",
+        linewidth=1.8,
+        capsize=3,
+        label="SLiM realization",
+    )
+    axis.errorbar(
+        x,
+        means["configured evolutionary prior"],
+        yerr=variations["configured evolutionary prior"],
         color="black",
         linewidth=1.4,
+        capsize=3,
         label=r"configured evolutionary prior ($\sigma_a^2=1$, $W_S=1$)",
     )
-    axis.plot(
+    axis.errorbar(
         x,
-        evo,
+        means["evo-lmm fitted prior"],
+        yerr=variations["evo-lmm fitted prior"],
         color="tab:red",
         linestyle="--",
         marker="s",
         linewidth=1.8,
+        capsize=3,
         label="evo-lmm fitted prior",
     )
-    axis.plot(
+    axis.errorbar(
         x,
-        bolt,
+        means["GRAPP BOLT-LMM"],
+        yerr=variations["GRAPP BOLT-LMM"],
         color="tab:blue",
         linestyle=":",
         marker="^",
         linewidth=2.0,
+        capsize=3,
         label=r"GRAPP BOLT-LMM (global GRM)",
     )
     axis.set_xticks(x, [f"{threshold:g}" for threshold in MAF_THRESHOLDS], rotation=35, ha="right")
@@ -456,7 +629,7 @@ def make_summary(result: BenchmarkResult) -> plt.Figure:
     axis.set_title(
         "Cumulative genic variance across MAF bins\n"
         rf"$N={N_INDIVIDUALS}$, $V_S={V_S:g}$, $W_S={W_S:g}$, "
-        rf"$\rho^2=1$, seed={result.seed}"
+        rf"$\rho^2=1$, {result.n_replicates} replicates"
     )
     axis.grid(axis="y", linestyle=":", alpha=0.55)
     axis.set_ylim(bottom=0.0)
@@ -464,8 +637,11 @@ def make_summary(result: BenchmarkResult) -> plt.Figure:
     axis.text(
         0.98,
         0.06,
-        f"runtime\nevo-lmm: {result.evo_seconds:.2f} s\n"
-        f"GRAPP BOLT-LMM: {result.bolt_seconds:.2f} s",
+        "runtime (mean $\\pm$ SD)\n"
+        f"evo-lmm: {result.runtime_summary()['evo-lmm'][0]:.2f} "
+        f"$\\pm$ {result.runtime_summary()['evo-lmm'][1]:.2f} s\n"
+        f"GRAPP BOLT-LMM: {result.runtime_summary()['GRAPP BOLT-LMM'][0]:.2f} "
+        f"$\\pm$ {result.runtime_summary()['GRAPP BOLT-LMM'][1]:.2f} s",
         transform=axis.transAxes,
         ha="right",
         va="bottom",
@@ -476,12 +652,21 @@ def make_summary(result: BenchmarkResult) -> plt.Figure:
 
 
 if __name__ == "__main__":
+    forward_artifacts = Path("docs/_artifacts/forward_replicates")
     artifact_directory = Path("docs/_artifacts/bolt_seed_812")
-    benchmark = run_benchmark(
-        data_directory=artifact_directory if artifact_directory.exists() else None,
-    )
+    if forward_artifacts.exists():
+        from slim_forward_simplified import load_simulation_replicates
+
+        benchmark = run_benchmark(
+            forward_results=load_simulation_replicates(forward_artifacts),
+        )
+    else:
+        benchmark = run_benchmark(
+            data_directory=artifact_directory if artifact_directory.exists() else None,
+        )
     print(
-        f"mutations={benchmark.data.full_grg.num_mutations} "
+        f"replicates={benchmark.n_replicates} "
+        f"mutations_first={benchmark.data.full_grg.num_mutations} "
         f"evo_lmm_seconds={benchmark.evo_seconds:.6f} "
         f"grapp_bolt_lmm_seconds={benchmark.bolt_seconds:.6f}"
     )

@@ -40,7 +40,11 @@ def generate() -> None:
 
     import slim_forward_simplified
 
-    forward_results = slim_forward_simplified.run_replicates(workers=4)
+    forward_artifacts = DOCS_DIRECTORY / "_artifacts" / "forward_replicates"
+    forward_results = slim_forward_simplified.run_replicates(
+        workers=4,
+        artifact_directory=forward_artifacts,
+    )
     forward_figure = slim_forward_simplified.make_summary(forward_results)
     forward_figure.savefig(
         OUTPUT_DIRECTORY / "slim_forward_simplified.png",
@@ -51,10 +55,7 @@ def generate() -> None:
 
     import bolt_benchmark
 
-    benchmark_artifacts = DOCS_DIRECTORY / "_artifacts" / "bolt_seed_812"
-    benchmark = bolt_benchmark.run_benchmark(
-        data_directory=benchmark_artifacts if benchmark_artifacts.exists() else None,
-    )
+    benchmark = bolt_benchmark.run_benchmark(forward_results=forward_results)
     benchmark_figure = bolt_benchmark.make_summary(benchmark)
     benchmark_figure.savefig(
         OUTPUT_DIRECTORY / "bolt_benchmark.png",
