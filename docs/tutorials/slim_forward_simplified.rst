@@ -78,7 +78,7 @@ historical nodes as samples.
       :language: python
       :linenos:
 
-Run it from the repository root with:
+Run the simulation and fitting workflow with:
 
 .. code-block:: console
 

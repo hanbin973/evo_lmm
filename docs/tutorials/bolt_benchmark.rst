@@ -117,8 +117,7 @@ the sample standard deviation. The runtime annotation uses the same summary.
       :language: python
       :linenos:
 
-Prepare the ten forward-simulation and GRG artifacts once from the repository
-root:
+Generate the ten forward-simulation replicates and their GRGs:
 
 .. code-block:: console
 
@@ -130,9 +129,7 @@ Then rerun the ten-replicate fitting comparison without repeating SLiM:
 
    uv run python docs/tutorials/fit_bolt_benchmark.py
 
-The prepared files live under ``docs/_artifacts/`` and are ignored by Git.
-``bolt_benchmark.py`` and the figure generator reuse them when present. The
-fit-only script reports each replicate together with the mean and sample
+The fit-only script reports each replicate together with the mean and sample
 standard deviation of both runtimes.
 
 The current ten-replicate fit run reports:
