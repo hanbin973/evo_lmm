@@ -403,6 +403,7 @@ def fit_reml(
     exact: bool | None = None,
     trace_method: str = "hutchinson",
     warm_start: bool = True,
+    initialization: str = "default",
 ) -> FitResult:
     """Fit evolutionary shape parameters by profiled average-information REML.
 
@@ -414,8 +415,11 @@ def fit_reml(
 
     if model is not None and model != ops.model_name:
         raise ValueError("model does not match EvolutionaryLmmOps.model")
+    if initialization not in ("default", "he"):
+        raise ValueError("initialization must be 'default' or 'he'")
     model_name = ops.model_name
     y_arr = _validate_y(y, ops.n)
+    diagnostics_warnings: set[str] = set()
     fixed_r_boundary = bool(
         model_name == "full"
         and (
@@ -434,6 +438,19 @@ def fit_reml(
     coords[1] = max(coords[1], np.log(np.finfo(np.float64).tiny))
     if model_name == "full":
         coords[2] = float(np.clip(coords[2], -20.0, 20.0))
+    if initialization == "he":
+        # HE estimates the residual-to-genetic variance ratio while retaining
+        # the requested (or default) evolutionary shape parameters.  The
+        # scale itself is profiled by REML, so only its delta is carried into
+        # transformed coordinates.
+        he_prior, _ = prior_from_coordinates(model_name, coords)
+        _he_sigma_b2, _he_sigma_e2, he_delta = haseman_elston_initialization(
+            ops, y_arr, he_prior, probes=trace_probes, seed=seed
+        )
+        if np.isfinite(he_delta) and he_delta > 0.0:
+            coords[0] = float(np.log(he_delta))
+        else:
+            diagnostics_warnings = {"HE initialization was invalid; using requested/default delta"}
     if trace_method not in ("xtrace", "hutchinson"):
         raise ValueError("trace_method must be 'xtrace' or 'hutchinson'")
     probe_count = max(int(trace_probes), 2)
@@ -444,7 +461,6 @@ def fit_reml(
     )
     is_dense = all(chrom.dense is not None for chrom in ops._chromosomes)
     use_exact = is_dense if exact is None else bool(exact)
-    diagnostics_warnings: set[str] = set()
     converged = False
     last_step = 0.0
     last_q: _Quantities | None = None
@@ -578,6 +594,7 @@ def fit_reml(
         accepted_step=float(last_step),
         trace_estimator="exact" if use_exact else trace_method,
         trace_probes=0 if use_exact else probe_count,
+        initialization=initialization,
         trace_operator_queries=(
             0 if use_exact else (2 * probe_count if trace_method == "xtrace" else probe_count)
         ),

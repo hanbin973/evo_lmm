@@ -176,8 +176,8 @@ That setup is useful for timing but is not a production convergence policy.
 
 - [ ] Define and test a production convergence policy independently of the
   matched-budget benchmark.
-- [ ] Wire `haseman_elston_initialization()` into `fit_reml()` as an optional
-  initialization mode; it currently exists but is not selected automatically.
+- [x] Wire `haseman_elston_initialization()` into `fit_reml()` as the optional
+  `initialization="he"` mode. The default remains unchanged.
 - [ ] Add a matrix-free full-model GRG recovery test away from the `rho`
   boundaries.
 - [ ] Add explicit tests for trace-error-driven non-convergence and any retry or

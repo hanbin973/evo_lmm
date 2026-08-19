@@ -23,6 +23,7 @@ class FitDiagnostics:
     accepted_step: float
     trace_estimator: str
     trace_probes: int
+    initialization: str = "default"
     trace_operator_queries: int = 0
     trace_standard_errors: dict[str, float] = field(default_factory=dict)
     cg_iterations: list[int] = field(default_factory=list)

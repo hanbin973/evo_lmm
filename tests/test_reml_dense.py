@@ -1,7 +1,7 @@
 import numpy as np
 
 from evo_lmm import EvolutionaryLmmOps, FullPrior, SimplifiedPrior, exact_reml_score, fit_reml
-from evo_lmm.reml import _profile_objective_dense, _quantities
+from evo_lmm.reml import _profile_objective_dense, _quantities, haseman_elston_initialization
 
 
 def test_dense_reml_score_matches_profiled_objective_derivative():
@@ -48,3 +48,24 @@ def test_matrix_free_projected_solve_and_seeded_trace_are_reproducible():
     rhs = np.column_stack((y, np.roll(y, 1), np.ones(ops.n)))
     batch = ops.solve_ph(rhs, phi, tol=1e-11)
     assert np.allclose(batch, np.column_stack([ops.solve_ph(rhs[:, i], phi, tol=1e-11) for i in range(rhs.shape[1])]), atol=1e-8)
+
+
+def test_haseman_elston_initialization_is_available_as_fit_mode():
+    rng = np.random.default_rng(11)
+    x = rng.binomial(2, 0.35, size=(26, 9)).astype(float)
+    ops = EvolutionaryLmmOps.from_dense(x, x.mean(axis=0) / 2.0, model="simplified")
+    y = rng.normal(size=ops.n)
+    sigma_b2, sigma_e2, delta = haseman_elston_initialization(
+        ops, y, SimplifiedPrior(1.0, 0.3), seed=3
+    )
+    assert sigma_b2 > 0.0 and sigma_e2 > 0.0 and delta > 0.0
+    fit = fit_reml(ops, y, initialization="he", max_iter=2, exact=True)
+    assert fit.diagnostics.initialization == "he"
+    assert np.isfinite(fit.delta) and fit.delta > 0.0
+
+
+def test_unknown_initialization_mode_is_rejected():
+    x = np.ones((8, 3), dtype=float)
+    ops = EvolutionaryLmmOps.from_dense(x, np.full(3, 0.5))
+    with np.testing.assert_raises(ValueError):
+        fit_reml(ops, np.arange(8, dtype=float), initialization="nonsense")

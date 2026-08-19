@@ -40,6 +40,7 @@ def fit_evolutionary_lmm(
     exact: bool | None = None,
     trace_method: str = "hutchinson",
     warm_start: bool = True,
+    initialization: str = "default",
 ) -> FitResult:
     """Fit a simplified or full evolutionary LMM from dense matrices or GRGs.
 
@@ -93,6 +94,7 @@ def fit_evolutionary_lmm(
         exact=exact,
         trace_method=trace_method,
         warm_start=warm_start,
+        initialization=initialization,
     )
 
 
@@ -111,6 +113,7 @@ def fit_evolutionary_bolt_lmm(
     cg_tol: float = 1e-9,
     trace_method: str = "hutchinson",
     warm_start: bool = True,
+    initialization: str = "default",
 ) -> FitResult:
     """Fit the CPU GRGL-backed evolutionary model across chromosomes."""
 
@@ -129,6 +132,7 @@ def fit_evolutionary_bolt_lmm(
         exact=False,
         trace_method=trace_method,
         warm_start=warm_start,
+        initialization=initialization,
     )
 
 
