@@ -48,7 +48,7 @@ The forward model
 The simulation fixes a diploid population of 2,000 individuals, runs for
 ``4N = 8,000`` generations across ``L = 10^6`` bases, and records a tree
 sequence. It uses ``V_S = 2N = 4,000``, hence ``W_S = 1``. The complete SLiM
-source is available below.
+source is included in the following expandable block.
 
 .. dropdown:: Show the SLiM model
    :color: light
@@ -59,8 +59,7 @@ source is available below.
 
 SLiM records the mutation effects in tree-sequence metadata. The production
 scripts separate burn-in and replicate runs; this compact version combines the
-essential steps for a reproducible example. The checked-in figure is generated
-locally, so documentation builds do not rerun the simulation.
+essential steps for a reproducible example.
 
 SLiM to GRG to evo-lmm
 ----------------------
@@ -102,10 +101,6 @@ the dashed purple curve is a local linear summary of the same segregating
 variants. Folding to minor allele frequency displays the symmetry in
 ``x * (1 - x)`` directly. The right panel shows fitted variance components
 across all ten replicates; dotted segments mark their generating values.
-
-The figure is a pre-generated asset. To regenerate it and the other tutorial
-figures, run ``uv run python docs/generate_figures.py`` from the repository
-root.
 
 .. image:: ../_static/generated/slim_forward_simplified.png
    :alt: Forward-simulation effect spectrum and fitted simplified prior summary
