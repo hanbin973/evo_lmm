@@ -1,0 +1,4 @@
+# The documentation build uses the same Sphinx stack as grapp and grgl.
+sphinx
+pydata-sphinx-theme
+matplotlib

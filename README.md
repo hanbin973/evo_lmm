@@ -99,6 +99,20 @@ Run the current entry point with `uv run python main.py`. Keep dependency
 changes in `pyproject.toml` and regenerate the lockfile with `uv lock` (or
 `uv sync`). See [AGENTS.md](AGENTS.md) for implementation conventions.
 
+## Documentation
+
+The documentation follows the Sphinx layout used by GRGL and GRAPP. Install
+the documentation dependencies through the uv development group and build the
+HTML site with:
+
+```bash
+uv sync
+uv run sphinx-build -W -b html docs docs/_build/html
+```
+
+The generated site includes the [public API](docs/reference/public_api.rst) and
+a ten-replicate, 1,000-individual variance-component tutorial with box plots.
+
 ## Library example
 
 The public API keeps evolutionary model weights separate from the

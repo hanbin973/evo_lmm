@@ -1,0 +1,1997 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Public API &#8212; evo-lmm  documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=90905a2f556bf617f1a9" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=90905a2f556bf617f1a9" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/plot_directive.css?v=7f9a90b1" />
+  
+  <!-- So that users can add custom icons -->
+  <script defer src="../_static/scripts/fontawesome.js?digest=90905a2f556bf617f1a9"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=90905a2f556bf617f1a9" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=90905a2f556bf617f1a9" />
+
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'reference/public_api';</script>
+    <script>DOCUMENTATION_OPTIONS.search_as_you_type = false;</script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="Reference" href="index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  
+    
+    <script src="../_static/searchtools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <script src="../searchindex.js"></script>
+  
+  </head>
+  <body data-default-mode="">
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+  
+  
+  
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header id="pst-header" class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">evo-lmm  documentation</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../overview/index.html">
+    Overview
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../howto/index.html">
+    How-to guides
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="index.html">
+    Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-external" href="https://grgl.readthedocs.io/en/latest/">
+    GRGL documentation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-external" href="https://grapp.readthedocs.io/en/latest/">
+    GRAPP documentation
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/hanbin973/fast_lmm" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i><span class="visually-hidden">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../overview/index.html">
+    Overview
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../howto/index.html">
+    How-to guides
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="index.html">
+    Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-external" href="https://grgl.readthedocs.io/en/latest/">
+    GRGL documentation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-external" href="https://grapp.readthedocs.io/en/latest/">
+    GRAPP documentation
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/hanbin973/fast_lmm" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i><span class="visually-hidden">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item pst-sidebar-collapse"><button id="pst-collapse-sidebar-button" aria-expanded="true" aria-controls="pst-primary-sidebar">
+  <svg class="pst-icon" role="img" aria-hidden="true" focusable="false" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+    <path fill="currentColor" d="M3 15.5C2.36232 15.5 1.74874 15.2564 1.28478 14.8189C0.820828 14.3815 0.541576 13.7832 0.504167 13.1467L0.5 13L0.5 3C0.499965 2.36232 0.743605 1.74874 1.18107 1.28478C1.61854 0.820828 2.21676 0.541576 2.85333 0.504167L3 0.5L13 0.5C13.6377 0.499965 14.2513 0.743605 14.7152 1.18107C15.1792 1.61854 15.4584 2.21676 15.4958 2.85333L15.5 3L15.5 13C15.5 13.6377 15.2564 14.2513 14.8189 14.7152C14.3815 15.1792 13.7832 15.4584 13.1467 15.4958L13 15.5L3 15.5ZM3 13.8333L10.5 13.8333L10.5 2.16667L3 2.16667C2.79589 2.16669 2.59889 2.24163 2.44636 2.37726C2.29383 2.5129 2.19638 2.69979 2.1725 2.9025L2.16667 3L2.16667 13C2.16669 13.2041 2.24163 13.4011 2.37726 13.5536C2.5129 13.7062 2.69979 13.8036 2.9025 13.8275L3 13.8333ZM6.65583 10.325L6.5775 10.2558L4.91083 8.58917C4.76735 8.44567 4.68116 8.25476 4.66843 8.05223C4.65569 7.84971 4.71729 7.6495 4.84167 7.48917L4.91083 7.41083L6.5775 5.74417C6.72747 5.59471 6.9287 5.50794 7.14032 5.50148C7.35194 5.49502 7.55809 5.56935 7.7169 5.70937C7.8757 5.8494 7.97525 6.04463 7.99533 6.25539C8.01541 6.46616 7.95451 6.67667 7.825 6.84417L7.75583 6.9225L6.67917 8L7.75583 9.0775C7.89931 9.22099 7.98551 9.41191 7.99824 9.61443C8.01097 9.81695 7.94938 10.0172 7.825 10.1775L7.75583 10.2558C7.61234 10.3993 7.42142 10.4855 7.2189 10.4982C7.01638 10.511 6.81617 10.4494 6.65583 10.325Z"/>
+  </svg>
+  <span class="pst-collapse-sidebar-label">Collapse Sidebar</span>
+  <span class="pst-expand-sidebar-label">Expand Sidebar</span>
+</button></div>
+        <div class="sidebar-primary-item">
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Public API</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Reference</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Public API</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="public-api">
+<h1>Public API<a class="headerlink" href="#public-api" title="Link to this heading">#</a></h1>
+<p>The top-level <code class="docutils literal notranslate"><span class="pre">evo_lmm</span></code> namespace contains the supported public classes and
+functions. The signatures below are generated directly from the installed
+package.</p>
+<p id="module-evo_lmm">Evolutionary random-effects LMMs backed by raw GRGL dosage operators.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="evo_lmm.AssociationResult">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">AssociationResult</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chrom</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">local_idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">score</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">beta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">se</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chisq</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pvalue</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.AssociationResult" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Compact BOLT-compatible association output for one chromosome block.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>chrom</strong> (<em>Any</em>)</p></li>
+<li><p><strong>local_idx</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>score</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>beta</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>se</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>chisq</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>pvalue</strong> (<em>ndarray</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="evo_lmm.DenseREMLOracle">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">DenseREMLOracle</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">genotypes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frequencies</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">covariates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'simplified'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.DenseREMLOracle" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Convenient exact REML oracle for tests and small dense simulations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>genotypes</strong> (<em>np.ndarray</em>)</p></li>
+<li><p><strong>frequencies</strong> (<em>np.ndarray</em>)</p></li>
+<li><p><strong>covariates</strong> (<em>np.ndarray</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>model</strong> (<em>str</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="evo_lmm.EvolutionaryLmmOps">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">EvolutionaryLmmOps</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chromosomes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frequencies</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">covariates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_filter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'simplified'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mutation_filter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.EvolutionaryLmmOps" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Matrix-free projected raw-dosage operators for evolutionary LMMs.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>chromosomes</strong> (<em>Any</em>) – An <code class="docutils literal notranslate"><span class="pre">(N,</span> <span class="pre">M)</span></code> dense dosage matrix, a mapping of chromosome labels to
+matrices/GRGs, or a sequence of matrices/<code class="docutils literal notranslate"><span class="pre">(label,</span> <span class="pre">source)</span></code> pairs.</p></li>
+<li><p><strong>frequencies</strong> (<em>Any</em>) – Sample allele frequencies, supplied as one vector, one vector per
+chromosome, or a mapping.  GRG inputs may omit this and extract them
+through GRAPP’s frequency traversal.</p></li>
+<li><p><strong>covariates</strong> (<em>np.ndarray</em><em> | </em><em>None</em>) – Fixed-effect design.  An intercept is added when absent and the basis
+is QR-orthonormalised once.</p></li>
+<li><p><strong>model</strong> (<em>str</em>) – Coordinate interpretation for transformed <code class="docutils literal notranslate"><span class="pre">phi</span></code> arrays.</p></li>
+<li><p><strong>sample_filter</strong> (<em>Sequence</em><em>[</em><em>int</em><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>mutation_filter</strong> (<em>Mapping</em><em>[</em><em>Any</em><em>, </em><em>Sequence</em><em>[</em><em>int</em><em>]</em><em>] </em><em>| </em><em>None</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="evo_lmm.EvolutionaryLmmOps.from_dense">
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">from_dense</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">genotypes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frequencies</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">covariates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">chrom_labels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'simplified'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.EvolutionaryLmmOps.from_dense" title="Link to this definition">#</a></dt>
+<dd><p>Convenience constructor for dense tests and small simulations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>genotypes</strong> (<em>ndarray</em><em> | </em><em>Sequence</em><em>[</em><em>ndarray</em><em>]</em>)</p></li>
+<li><p><strong>frequencies</strong> (<em>ndarray</em><em> | </em><em>Sequence</em><em>[</em><em>ndarray</em><em>]</em>)</p></li>
+<li><p><strong>covariates</strong> (<em>ndarray</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>chrom_labels</strong> (<em>Sequence</em><em>[</em><em>Any</em><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>model</strong> (<em>str</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#evo_lmm.EvolutionaryLmmOps" title="evo_lmm.operators.EvolutionaryLmmOps"><em>EvolutionaryLmmOps</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="evo_lmm.EvolutionaryLmmOps.apply_model_x">
+<span class="sig-name descname"><span class="pre">apply_model_x</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">weights</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">theta</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_chrom</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.EvolutionaryLmmOps.apply_model_x" title="Link to this definition">#</a></dt>
+<dd><p>Apply <code class="docutils literal notranslate"><span class="pre">P_C</span> <span class="pre">X</span> <span class="pre">diag(weights)</span></code> to variant coefficients.</p>
+<p><code class="docutils literal notranslate"><span class="pre">weights</span></code> is normally a vector of model coefficients.  When <code class="docutils literal notranslate"><span class="pre">theta</span></code>
+is a prior, it applies the model operator <code class="docutils literal notranslate"><span class="pre">P_C</span> <span class="pre">X</span> <span class="pre">diag(sqrt(w(theta)))</span></code>
+to those coefficients.  A raw coefficient vector or chromosome mapping
+may also be supplied without <code class="docutils literal notranslate"><span class="pre">theta</span></code>.  This method deliberately
+contains no sample-standardisation or <code class="docutils literal notranslate"><span class="pre">1/M</span></code> normalization.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>weights</strong> (<em>ndarray</em><em> | </em><em>Mapping</em><em>[</em><em>Any</em><em>, </em><em>ndarray</em><em>] </em><em>| </em><a class="reference internal" href="#evo_lmm.EvolutionaryPrior" title="evo_lmm.priors.EvolutionaryPrior"><em>EvolutionaryPrior</em></a>)</p></li>
+<li><p><strong>theta</strong> (<em>Any</em>)</p></li>
+<li><p><strong>exclude_chrom</strong> (<em>Any</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="evo_lmm.EvolutionaryLmmOps.model_scores">
+<span class="sig-name descname"><span class="pre">model_scores</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vector</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">theta</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_chrom</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.EvolutionaryLmmOps.model_scores" title="Link to this definition">#</a></dt>
+<dd><p>Return model scores, optionally for <code class="docutils literal notranslate"><span class="pre">B_theta^T</span> <span class="pre">=</span> <span class="pre">diag(sqrt(w))X^T</span> <span class="pre">P_C</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>vector</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>theta</strong> (<em>Any</em>)</p></li>
+<li><p><strong>exclude_chrom</strong> (<em>Any</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="evo_lmm.EvolutionaryLmmOps.apply_k">
+<span class="sig-name descname"><span class="pre">apply_k</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vector</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">theta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_chrom</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.EvolutionaryLmmOps.apply_k" title="Link to this definition">#</a></dt>
+<dd><p>Apply <code class="docutils literal notranslate"><span class="pre">K</span> <span class="pre">=</span> <span class="pre">P_C</span> <span class="pre">X</span> <span class="pre">diag(w(theta))</span> <span class="pre">X^T</span> <span class="pre">P_C</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>vector</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>theta</strong> (<em>Any</em>)</p></li>
+<li><p><strong>exclude_chrom</strong> (<em>Any</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="evo_lmm.EvolutionaryLmmOps.apply_dk">
+<span class="sig-name descname"><span class="pre">apply_dk</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vector</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">theta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameter</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_chrom</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.EvolutionaryLmmOps.apply_dk" title="Link to this definition">#</a></dt>
+<dd><p>Apply a first derivative of <code class="docutils literal notranslate"><span class="pre">K</span></code> in a transformed shape coordinate.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>vector</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>theta</strong> (<em>Any</em>)</p></li>
+<li><p><strong>parameter</strong> (<em>str</em>)</p></li>
+<li><p><strong>exclude_chrom</strong> (<em>Any</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="evo_lmm.EvolutionaryLmmOps.apply_h">
+<span class="sig-name descname"><span class="pre">apply_h</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vector</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phi</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_chrom</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.EvolutionaryLmmOps.apply_h" title="Link to this definition">#</a></dt>
+<dd><p>Apply the projected shape matrix <code class="docutils literal notranslate"><span class="pre">H</span> <span class="pre">=</span> <span class="pre">K</span> <span class="pre">+</span> <span class="pre">delta</span> <span class="pre">I</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>vector</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>phi</strong> (<em>Any</em>)</p></li>
+<li><p><strong>exclude_chrom</strong> (<em>Any</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="evo_lmm.EvolutionaryLmmOps.apply_dh">
+<span class="sig-name descname"><span class="pre">apply_dh</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vector</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phi</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameter</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_chrom</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.EvolutionaryLmmOps.apply_dh" title="Link to this definition">#</a></dt>
+<dd><p>Apply a first derivative of <code class="docutils literal notranslate"><span class="pre">H</span></code> in <code class="docutils literal notranslate"><span class="pre">log_delta</span></code>, <code class="docutils literal notranslate"><span class="pre">log_tau</span></code>, or <code class="docutils literal notranslate"><span class="pre">logit_r</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>vector</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>phi</strong> (<em>Any</em>)</p></li>
+<li><p><strong>parameter</strong> (<em>str</em>)</p></li>
+<li><p><strong>exclude_chrom</strong> (<em>Any</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="evo_lmm.EvolutionaryLmmOps.solve_ph">
+<span class="sig-name descname"><span class="pre">solve_ph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rhs_columns</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phi</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_chrom</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-09</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_iter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.EvolutionaryLmmOps.solve_ph" title="Link to this definition">#</a></dt>
+<dd><p>Solve projected <code class="docutils literal notranslate"><span class="pre">H</span> <span class="pre">z</span> <span class="pre">=</span> <span class="pre">P_C</span> <span class="pre">rhs</span></code> for one or many right-hand sides.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>rhs_columns</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>phi</strong> (<em>Any</em>)</p></li>
+<li><p><strong>exclude_chrom</strong> (<em>Any</em>)</p></li>
+<li><p><strong>tol</strong> (<em>float</em>)</p></li>
+<li><p><strong>max_iter</strong> (<em>int</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>initial</strong> (<em>ndarray</em><em> | </em><em>None</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="evo_lmm.EvolutionaryLmmOps.test_scores">
+<span class="sig-name descname"><span class="pre">test_scores</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chrom</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vector</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.EvolutionaryLmmOps.test_scores" title="Link to this definition">#</a></dt>
+<dd><p>Return BOLT-normalised test-genotype scores for one chromosome.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>chrom</strong> (<em>Any</em>)</p></li>
+<li><p><strong>vector</strong> (<em>ndarray</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="evo_lmm.EvolutionaryLmmOps.test_column">
+<span class="sig-name descname"><span class="pre">test_column</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chrom</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">local_idx</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.EvolutionaryLmmOps.test_column" title="Link to this definition">#</a></dt>
+<dd><p>Return one projected, BOLT-normalised test-genotype column.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>chrom</strong> (<em>Any</em>)</p></li>
+<li><p><strong>local_idx</strong> (<em>int</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="evo_lmm.EvolutionaryLmmOps.local_indices">
+<span class="sig-name descname"><span class="pre">local_indices</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chrom</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.EvolutionaryLmmOps.local_indices" title="Link to this definition">#</a></dt>
+<dd><p>Return mutation identifiers for a chromosome in operator order.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>chrom</strong> (<em>Any</em>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="evo_lmm.EvolutionaryLmmOps.kernel_trace">
+<span class="sig-name descname"><span class="pre">kernel_trace</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">theta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_chrom</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.EvolutionaryLmmOps.kernel_trace" title="Link to this definition">#</a></dt>
+<dd><p>Return <code class="docutils literal notranslate"><span class="pre">tr(P_C</span> <span class="pre">K</span> <span class="pre">P_C)</span></code> without constructing a dense kernel.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>theta</strong> (<em>Any</em>)</p></li>
+<li><p><strong>exclude_chrom</strong> (<em>Any</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="evo_lmm.EvolutionaryLmmOps.dense_kernel">
+<span class="sig-name descname"><span class="pre">dense_kernel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">theta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_chrom</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.EvolutionaryLmmOps.dense_kernel" title="Link to this definition">#</a></dt>
+<dd><p>Materialise a kernel for a small dense input or a test oracle.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>theta</strong> (<em>Any</em>)</p></li>
+<li><p><strong>exclude_chrom</strong> (<em>Any</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="evo_lmm.EvolutionaryPrior">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">EvolutionaryPrior</span></span><a class="headerlink" href="#evo_lmm.EvolutionaryPrior" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Common interface implemented by the two evolutionary priors.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="evo_lmm.EvolutionaryPrior.coordinates">
+<span class="sig-name descname"><span class="pre">coordinates</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">delta</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.EvolutionaryPrior.coordinates" title="Link to this definition">#</a></dt>
+<dd><p>Return unconstrained <code class="docutils literal notranslate"><span class="pre">(log_delta,</span> <span class="pre">log_tau[,</span> <span class="pre">logit_r])</span></code> coordinates.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>delta</strong> (<em>float</em>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="evo_lmm.FitDiagnostics">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">FitDiagnostics</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">converged</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">iterations</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">objective</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">score_norm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ai_condition</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ai_damping</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">accepted_step</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trace_estimator</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trace_probes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trace_standard_errors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cg_iterations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">random_seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">boundary_hits</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">warnings</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">()</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.FitDiagnostics" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Numerical and identifiability diagnostics from a fit.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>converged</strong> (<em>bool</em>)</p></li>
+<li><p><strong>iterations</strong> (<em>int</em>)</p></li>
+<li><p><strong>objective</strong> (<em>float</em>)</p></li>
+<li><p><strong>score_norm</strong> (<em>float</em>)</p></li>
+<li><p><strong>ai_condition</strong> (<em>float</em>)</p></li>
+<li><p><strong>ai_damping</strong> (<em>float</em>)</p></li>
+<li><p><strong>accepted_step</strong> (<em>float</em>)</p></li>
+<li><p><strong>trace_estimator</strong> (<em>str</em>)</p></li>
+<li><p><strong>trace_probes</strong> (<em>int</em>)</p></li>
+<li><p><strong>trace_standard_errors</strong> (<em>dict</em><em>[</em><em>str</em><em>, </em><em>float</em><em>]</em>)</p></li>
+<li><p><strong>cg_iterations</strong> (<em>list</em><em>[</em><em>int</em><em>]</em>)</p></li>
+<li><p><strong>random_seed</strong> (<em>int</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>boundary_hits</strong> (<em>tuple</em><em>[</em><em>str</em><em>, </em><em>...</em><em>]</em>)</p></li>
+<li><p><strong>warnings</strong> (<em>tuple</em><em>[</em><em>str</em><em>, </em><em>...</em><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="evo_lmm.FitResult">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">FitResult</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prior</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sigma_b2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sigma_e2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">h2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_likelihood</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fixed_effects</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">projected_phenotype</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ph_y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">diagnostics</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ops</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.FitResult" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Scientific-scale fit result for an evolutionary LMM.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>prior</strong> (<a class="reference internal" href="#evo_lmm.EvolutionaryPrior" title="evo_lmm.priors.EvolutionaryPrior"><em>EvolutionaryPrior</em></a>)</p></li>
+<li><p><strong>sigma_b2</strong> (<em>float</em>)</p></li>
+<li><p><strong>sigma_e2</strong> (<em>float</em>)</p></li>
+<li><p><strong>delta</strong> (<em>float</em>)</p></li>
+<li><p><strong>h2</strong> (<em>float</em>)</p></li>
+<li><p><strong>log_likelihood</strong> (<em>float</em>)</p></li>
+<li><p><strong>fixed_effects</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>projected_phenotype</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>ph_y</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>diagnostics</strong> (<a class="reference internal" href="#evo_lmm.FitDiagnostics" title="evo_lmm.results.FitDiagnostics"><em>FitDiagnostics</em></a>)</p></li>
+<li><p><strong>model</strong> (<em>str</em>)</p></li>
+<li><p><strong>ops</strong> (<em>Any</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py property">
+<dt class="sig sig-object py" id="evo_lmm.FitResult.sigma_g2">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">sigma_g2</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span><a class="headerlink" href="#evo_lmm.FitResult.sigma_g2" title="Link to this definition">#</a></dt>
+<dd><p>Compatibility alias; unlike GRAPP this is raw-effect <code class="docutils literal notranslate"><span class="pre">sigma_b2</span></code>.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="evo_lmm.FitResult.blup">
+<span class="sig-name descname"><span class="pre">blup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.FitResult.blup" title="Link to this definition">#</a></dt>
+<dd><p>Return the projected genetic-value BLUP <code class="docutils literal notranslate"><span class="pre">sigma_b2</span> <span class="pre">K</span> <span class="pre">P_V</span> <span class="pre">y</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="evo_lmm.FullPrior">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">FullPrior</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sigma_b2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tau</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rho</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.FullPrior" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#evo_lmm.EvolutionaryPrior" title="evo_lmm.priors.EvolutionaryPrior"><code class="xref py py-class docutils literal notranslate"><span class="pre">EvolutionaryPrior</span></code></a></p>
+<p>The full evolutionary prior with identifiable coupling <code class="docutils literal notranslate"><span class="pre">rho^2</span></code>.</p>
+<p>Only <code class="docutils literal notranslate"><span class="pre">rho^2</span></code> appears in the conditional variance, so the sign of <code class="docutils literal notranslate"><span class="pre">rho</span></code>
+is not identifiable.  The public parameter accepts <code class="docutils literal notranslate"><span class="pre">-1</span> <span class="pre">&lt;=</span> <span class="pre">rho</span> <span class="pre">&lt;=</span> <span class="pre">1</span></code> and
+the optimizer works directly with <code class="docutils literal notranslate"><span class="pre">r</span> <span class="pre">=</span> <span class="pre">rho^2</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>sigma_b2</strong> (<em>float</em>)</p></li>
+<li><p><strong>tau</strong> (<em>float</em>)</p></li>
+<li><p><strong>rho</strong> (<em>float</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="evo_lmm.SimplifiedPrior">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">SimplifiedPrior</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sigma_b2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tau</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.SimplifiedPrior" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#evo_lmm.EvolutionaryPrior" title="evo_lmm.priors.EvolutionaryPrior"><code class="xref py py-class docutils literal notranslate"><span class="pre">EvolutionaryPrior</span></code></a></p>
+<p>The exact <code class="docutils literal notranslate"><span class="pre">rho^2</span> <span class="pre">=</span> <span class="pre">1</span></code> evolutionary prior.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>sigma_b2</strong> (<em>float</em>) – Per-locus focal-trait effect variance on raw dosage units.</p></li>
+<li><p><strong>tau</strong> (<em>float</em>) – Non-negative <code class="docutils literal notranslate"><span class="pre">sigma_a^2</span> <span class="pre">/</span> <span class="pre">W_S</span></code> aggregate.  <code class="docutils literal notranslate"><span class="pre">tau=0</span></code> is the
+frequency-independent boundary and is useful for tests and diagnostics.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="evo_lmm.GrgSimulation">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">GrgSimulation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tree_sequence</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grg</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frequencies</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">effects</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">genetic_value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phenotype</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prior</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">residual_variance</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.GrgSimulation" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A simulated GRG phenotype with effects sampled from an evolutionary prior.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>tree_sequence</strong> (<em>Any</em>)</p></li>
+<li><p><strong>grg</strong> (<em>Any</em>)</p></li>
+<li><p><strong>frequencies</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>effects</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>genetic_value</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>phenotype</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>prior</strong> (<a class="reference internal" href="#evo_lmm.EvolutionaryPrior" title="evo_lmm.priors.EvolutionaryPrior"><em>EvolutionaryPrior</em></a>)</p></li>
+<li><p><strong>residual_variance</strong> (<em>float</em>)</p></li>
+<li><p><strong>seed</strong> (<em>int</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="evo_lmm.VariantData">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">VariantData</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frequencies</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">local_idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">raw_norm2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">centered_norm2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.VariantData" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Cached per-variant information used by an evolutionary operator.</p>
+<p><code class="docutils literal notranslate"><span class="pre">frequencies</span></code> are sample allele frequencies and <code class="docutils literal notranslate"><span class="pre">local_idx</span></code> are the
+mutation identifiers in the source chromosome.  <code class="docutils literal notranslate"><span class="pre">raw_norm2</span></code> and
+<code class="docutils literal notranslate"><span class="pre">centered_norm2</span></code> are optional because GRGL operators can obtain them via
+graph traversals when needed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>frequencies</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>local_idx</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>raw_norm2</strong> (<em>ndarray</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>centered_norm2</strong> (<em>ndarray</em><em> | </em><em>None</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="evo_lmm.allele_frequency_q">
+<span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">allele_frequency_q</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frequencies</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.allele_frequency_q" title="Link to this definition">#</a></dt>
+<dd><p>Return <code class="docutils literal notranslate"><span class="pre">q</span> <span class="pre">=</span> <span class="pre">x_hat</span> <span class="pre">*</span> <span class="pre">(1</span> <span class="pre">-</span> <span class="pre">x_hat)</span></code> for sample allele frequencies.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>frequencies</strong> (<em>ndarray</em>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="evo_lmm.association">
+<span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">association</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">result</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_loco</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.association" title="Link to this definition">#</a></dt>
+<dd><p>Compute compact score/beta/SE association results from test operators.</p>
+<p>The test columns are BOLT-normalised and remain separate from the
+frequency-weighted model columns.  This CPU implementation intentionally
+returns typed arrays instead of coupling the core to a DataFrame package.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>result</strong> (<a class="reference internal" href="#evo_lmm.FitResult" title="evo_lmm.results.FitResult"><em>FitResult</em></a>)</p></li>
+<li><p><strong>y</strong> (<em>ndarray</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>use_loco</strong> (<em>bool</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>list[<a class="reference internal" href="#evo_lmm.AssociationResult" title="evo_lmm.results.AssociationResult"><em>AssociationResult</em></a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="evo_lmm.dense_variant_data">
+<span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">dense_variant_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">genotypes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frequencies</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">local_idx</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.dense_variant_data" title="Link to this definition">#</a></dt>
+<dd><p>Build variant metadata from an <code class="docutils literal notranslate"><span class="pre">(N,</span> <span class="pre">M)</span></code> raw dosage matrix.</p>
+<p>If frequencies are omitted, they are calculated as the mean dosage divided
+by ploidy two.  This default is deliberately explicit in the docstring and
+is only intended for diploid dense test/simulation inputs.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>genotypes</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>frequencies</strong> (<em>ndarray</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>local_idx</strong> (<em>Sequence</em><em>[</em><em>int</em><em>] </em><em>| </em><em>None</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#evo_lmm.VariantData" title="evo_lmm.grg_data.VariantData"><em>VariantData</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="evo_lmm.exact_average_information">
+<span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">exact_average_information</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">H</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">derivatives</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">covariates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.exact_average_information" title="Link to this definition">#</a></dt>
+<dd><p>Return the direct quadratic-form average-information matrix.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>y</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>H</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>derivatives</strong> (<em>Sequence</em><em>[</em><em>ndarray</em><em>]</em>)</p></li>
+<li><p><strong>covariates</strong> (<em>ndarray</em><em> | </em><em>None</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="evo_lmm.exact_reml_score">
+<span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">exact_reml_score</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">H</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">derivatives</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">covariates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.exact_reml_score" title="Link to this definition">#</a></dt>
+<dd><p>Return exact shape scores for <code class="docutils literal notranslate"><span class="pre">V</span> <span class="pre">=</span> <span class="pre">scale</span> <span class="pre">*</span> <span class="pre">H</span></code>.</p>
+<p>The scale is normally the profiled <code class="docutils literal notranslate"><span class="pre">sigma_b2</span></code>.  Omitting it evaluates the
+equivalent unit-scale score.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>y</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>H</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>derivatives</strong> (<em>Sequence</em><em>[</em><em>ndarray</em><em>]</em>)</p></li>
+<li><p><strong>covariates</strong> (<em>ndarray</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>scale</strong> (<em>float</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="evo_lmm.fit_dense_reml">
+<span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">fit_dense_reml</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">genotypes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frequencies</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">covariates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'simplified'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.fit_dense_reml" title="Link to this definition">#</a></dt>
+<dd><p>Fit the exact dense oracle in one call.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>genotypes</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>frequencies</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>y</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>covariates</strong> (<em>ndarray</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>model</strong> (<em>str</em>)</p></li>
+<li><p><strong>kwargs</strong> (<em>Any</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#evo_lmm.FitResult" title="evo_lmm.results.FitResult"><em>FitResult</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="evo_lmm.fit_evolutionary_bolt_lmm">
+<span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">fit_evolutionary_bolt_lmm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chrom_grgs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">frequencies</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">covariates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'simplified'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_filter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trace_probes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_iter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">50</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cg_tol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-09</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.fit_evolutionary_bolt_lmm" title="Link to this definition">#</a></dt>
+<dd><p>Fit the CPU GRGL-backed evolutionary model across chromosomes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>chrom_grgs</strong> (<em>Sequence</em><em>[</em><em>tuple</em><em>[</em><em>Any</em><em>, </em><em>Any</em><em>]</em><em>]</em>)</p></li>
+<li><p><strong>y</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>frequencies</strong> (<em>Mapping</em><em>[</em><em>Any</em><em>, </em><em>ndarray</em><em>] </em><em>| </em><em>Sequence</em><em>[</em><em>ndarray</em><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>covariates</strong> (<em>ndarray</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>model</strong> (<em>str</em>)</p></li>
+<li><p><strong>initial</strong> (<em>Any</em>)</p></li>
+<li><p><strong>sample_filter</strong> (<em>Sequence</em><em>[</em><em>int</em><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>trace_probes</strong> (<em>int</em>)</p></li>
+<li><p><strong>seed</strong> (<em>int</em>)</p></li>
+<li><p><strong>max_iter</strong> (<em>int</em>)</p></li>
+<li><p><strong>cg_tol</strong> (<em>float</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#evo_lmm.FitResult" title="evo_lmm.results.FitResult"><em>FitResult</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="evo_lmm.fit_evolutionary_bolt">
+<span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">fit_evolutionary_bolt</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chrom_grgs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">frequencies</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">covariates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'simplified'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_filter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trace_probes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_iter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">50</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cg_tol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-09</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.fit_evolutionary_bolt" title="Link to this definition">#</a></dt>
+<dd><p>Fit the CPU GRGL-backed evolutionary model across chromosomes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>chrom_grgs</strong> (<em>Sequence</em><em>[</em><em>tuple</em><em>[</em><em>Any</em><em>, </em><em>Any</em><em>]</em><em>]</em>)</p></li>
+<li><p><strong>y</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>frequencies</strong> (<em>Mapping</em><em>[</em><em>Any</em><em>, </em><em>ndarray</em><em>] </em><em>| </em><em>Sequence</em><em>[</em><em>ndarray</em><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>covariates</strong> (<em>ndarray</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>model</strong> (<em>str</em>)</p></li>
+<li><p><strong>initial</strong> (<em>Any</em>)</p></li>
+<li><p><strong>sample_filter</strong> (<em>Sequence</em><em>[</em><em>int</em><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>trace_probes</strong> (<em>int</em>)</p></li>
+<li><p><strong>seed</strong> (<em>int</em>)</p></li>
+<li><p><strong>max_iter</strong> (<em>int</em>)</p></li>
+<li><p><strong>cg_tol</strong> (<em>float</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#evo_lmm.FitResult" title="evo_lmm.results.FitResult"><em>FitResult</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="evo_lmm.fit_evolutionary_reml">
+<span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">fit_evolutionary_reml</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ops</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trace_probes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_iter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">50</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-06</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cg_tol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-09</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_step</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exact</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.fit_evolutionary_reml" title="Link to this definition">#</a></dt>
+<dd><p>Fit evolutionary shape parameters by profiled average-information REML.</p>
+<p><code class="docutils literal notranslate"><span class="pre">sigma_b2</span></code> is profiled as <code class="docutils literal notranslate"><span class="pre">y'P_H</span> <span class="pre">y</span> <span class="pre">/</span> <span class="pre">(N-rank(C))</span></code> and <code class="docutils literal notranslate"><span class="pre">sigma_e2</span></code> is
+derived as <code class="docutils literal notranslate"><span class="pre">delta*sigma_b2</span></code>.  Dense operators use exact traces by default;
+GRG operators use fixed common Hutchinson probes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ops</strong> (<a class="reference internal" href="#evo_lmm.EvolutionaryLmmOps" title="evo_lmm.operators.EvolutionaryLmmOps"><em>EvolutionaryLmmOps</em></a>)</p></li>
+<li><p><strong>y</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>model</strong> (<em>str</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>initial</strong> (<em>Any</em>)</p></li>
+<li><p><strong>delta</strong> (<em>float</em>)</p></li>
+<li><p><strong>trace_probes</strong> (<em>int</em>)</p></li>
+<li><p><strong>seed</strong> (<em>int</em>)</p></li>
+<li><p><strong>max_iter</strong> (<em>int</em>)</p></li>
+<li><p><strong>tol</strong> (<em>float</em>)</p></li>
+<li><p><strong>cg_tol</strong> (<em>float</em>)</p></li>
+<li><p><strong>max_step</strong> (<em>float</em>)</p></li>
+<li><p><strong>exact</strong> (<em>bool</em><em> | </em><em>None</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#evo_lmm.FitResult" title="evo_lmm.results.FitResult"><em>FitResult</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="evo_lmm.fit_evolutionary_lmm">
+<span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">fit_evolutionary_lmm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">genotypes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frequencies</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">covariates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'simplified'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_filter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trace_probes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_iter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">50</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cg_tol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-09</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exact</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.fit_evolutionary_lmm" title="Link to this definition">#</a></dt>
+<dd><p>Fit a simplified or full evolutionary LMM from dense matrices or GRGs.</p>
+<p>Missing phenotypes are removed before constructing the operator.  For GRGs,
+the corresponding individual sample filter is passed to GRAPP and allele
+frequencies are recomputed on the retained sample.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>genotypes</strong> (<em>Any</em>)</p></li>
+<li><p><strong>y</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>frequencies</strong> (<em>Any</em>)</p></li>
+<li><p><strong>covariates</strong> (<em>ndarray</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>model</strong> (<em>str</em>)</p></li>
+<li><p><strong>initial</strong> (<em>Any</em>)</p></li>
+<li><p><strong>sample_filter</strong> (<em>Sequence</em><em>[</em><em>int</em><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>trace_probes</strong> (<em>int</em>)</p></li>
+<li><p><strong>seed</strong> (<em>int</em>)</p></li>
+<li><p><strong>max_iter</strong> (<em>int</em>)</p></li>
+<li><p><strong>cg_tol</strong> (<em>float</em>)</p></li>
+<li><p><strong>exact</strong> (<em>bool</em><em> | </em><em>None</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#evo_lmm.FitResult" title="evo_lmm.results.FitResult"><em>FitResult</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="evo_lmm.fit_reml">
+<span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">fit_reml</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ops</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trace_probes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_iter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">50</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-06</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cg_tol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-09</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_step</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exact</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.fit_reml" title="Link to this definition">#</a></dt>
+<dd><p>Fit evolutionary shape parameters by profiled average-information REML.</p>
+<p><code class="docutils literal notranslate"><span class="pre">sigma_b2</span></code> is profiled as <code class="docutils literal notranslate"><span class="pre">y'P_H</span> <span class="pre">y</span> <span class="pre">/</span> <span class="pre">(N-rank(C))</span></code> and <code class="docutils literal notranslate"><span class="pre">sigma_e2</span></code> is
+derived as <code class="docutils literal notranslate"><span class="pre">delta*sigma_b2</span></code>.  Dense operators use exact traces by default;
+GRG operators use fixed common Hutchinson probes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ops</strong> (<a class="reference internal" href="#evo_lmm.EvolutionaryLmmOps" title="evo_lmm.operators.EvolutionaryLmmOps"><em>EvolutionaryLmmOps</em></a>)</p></li>
+<li><p><strong>y</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>model</strong> (<em>str</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>initial</strong> (<em>Any</em>)</p></li>
+<li><p><strong>delta</strong> (<em>float</em>)</p></li>
+<li><p><strong>trace_probes</strong> (<em>int</em>)</p></li>
+<li><p><strong>seed</strong> (<em>int</em>)</p></li>
+<li><p><strong>max_iter</strong> (<em>int</em>)</p></li>
+<li><p><strong>tol</strong> (<em>float</em>)</p></li>
+<li><p><strong>cg_tol</strong> (<em>float</em>)</p></li>
+<li><p><strong>max_step</strong> (<em>float</em>)</p></li>
+<li><p><strong>exact</strong> (<em>bool</em><em> | </em><em>None</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#evo_lmm.FitResult" title="evo_lmm.results.FitResult"><em>FitResult</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="evo_lmm.exact_reml_loglikelihood">
+<span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">exact_reml_loglikelihood</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">covariance</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">covariates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_constant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.exact_reml_loglikelihood" title="Link to this definition">#</a></dt>
+<dd><p>Evaluate the exact restricted log likelihood for a dense covariance.</p>
+<p><code class="docutils literal notranslate"><span class="pre">covariance</span></code> is the full <code class="docutils literal notranslate"><span class="pre">V</span></code> matrix.  The profiled form used by the
+fitter is obtained by passing <code class="docutils literal notranslate"><span class="pre">scale=1</span></code> and profiling that scale outside
+this function.  A fixed intercept is used when covariates are omitted.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>y</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>covariance</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>covariates</strong> (<em>ndarray</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>scale</strong> (<em>float</em>)</p></li>
+<li><p><strong>include_constant</strong> (<em>bool</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="evo_lmm.profiled_average_information">
+<span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">profiled_average_information</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">H</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">derivatives</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">covariates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.profiled_average_information" title="Link to this definition">#</a></dt>
+<dd><p>Return the shape AI after eliminating the profiled scale coordinate.</p>
+<p>The Schur complement is formed from the full coordinate vector
+<code class="docutils literal notranslate"><span class="pre">(log_sigma_b2,</span> <span class="pre">shape...)</span></code> with <code class="docutils literal notranslate"><span class="pre">H_scale</span> <span class="pre">=</span> <span class="pre">H</span></code>.  <code class="docutils literal notranslate"><span class="pre">scale</span></code> is the
+current profiled <code class="docutils literal notranslate"><span class="pre">sigma_b2</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>y</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>H</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>derivatives</strong> (<em>Sequence</em><em>[</em><em>ndarray</em><em>]</em>)</p></li>
+<li><p><strong>covariates</strong> (<em>ndarray</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>scale</strong> (<em>float</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="evo_lmm.haseman_elston_initialization">
+<span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">haseman_elston_initialization</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ops</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prior</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">probes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.haseman_elston_initialization" title="Link to this definition">#</a></dt>
+<dd><p>Estimate <code class="docutils literal notranslate"><span class="pre">(sigma_b2,</span> <span class="pre">sigma_e2,</span> <span class="pre">delta)</span></code> by projected HE moments.</p>
+<p>The moment solution is intentionally only an initializer.  Exact dense
+traces are used for dense operators; fixed-probe Hutchinson estimates are
+used for GRG operators.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ops</strong> (<a class="reference internal" href="#evo_lmm.EvolutionaryLmmOps" title="evo_lmm.operators.EvolutionaryLmmOps"><em>EvolutionaryLmmOps</em></a>)</p></li>
+<li><p><strong>y</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>prior</strong> (<a class="reference internal" href="#evo_lmm.EvolutionaryPrior" title="evo_lmm.priors.EvolutionaryPrior"><em>EvolutionaryPrior</em></a>)</p></li>
+<li><p><strong>probes</strong> (<em>int</em>)</p></li>
+<li><p><strong>seed</strong> (<em>int</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>tuple[float, float, float]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="evo_lmm.grg_variant_data">
+<span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">grg_variant_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grg</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">frequencies</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_filter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mutation_filter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.grg_variant_data" title="Link to this definition">#</a></dt>
+<dd><p>Build cached metadata for one GRG chromosome.</p>
+<p>GRGL retains mutation identifiers even when a mutation filter is supplied;
+the returned <code class="docutils literal notranslate"><span class="pre">local_idx</span></code> preserves those identifiers for <code class="docutils literal notranslate"><span class="pre">test_column</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>grg</strong> (<em>Any</em>)</p></li>
+<li><p><strong>frequencies</strong> (<em>ndarray</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>sample_filter</strong> (<em>Sequence</em><em>[</em><em>int</em><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>mutation_filter</strong> (<em>Sequence</em><em>[</em><em>int</em><em>] </em><em>| </em><em>None</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#evo_lmm.VariantData" title="evo_lmm.grg_data.VariantData"><em>VariantData</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="evo_lmm.loco_solve">
+<span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">loco_solve</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">result</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_chrom</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.loco_solve" title="Link to this definition">#</a></dt>
+<dd><p>Solve the fitted projected LOCO shape system for one chromosome.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>result</strong> (<a class="reference internal" href="#evo_lmm.FitResult" title="evo_lmm.results.FitResult"><em>FitResult</em></a>)</p></li>
+<li><p><strong>y</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>exclude_chrom</strong> (<em>Any</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="evo_lmm.loco_solutions">
+<span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">loco_solutions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">result</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.loco_solutions" title="Link to this definition">#</a></dt>
+<dd><p>Return one projected <code class="docutils literal notranslate"><span class="pre">P_H</span> <span class="pre">y</span></code> solution per chromosome exclusion.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>result</strong> (<a class="reference internal" href="#evo_lmm.FitResult" title="evo_lmm.results.FitResult"><em>FitResult</em></a>)</p></li>
+<li><p><strong>y</strong> (<em>ndarray</em><em> | </em><em>None</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>dict[<em>Any</em>, <em>ndarray</em>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="evo_lmm.predict_blup">
+<span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">predict_blup</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">result</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.predict_blup" title="Link to this definition">#</a></dt>
+<dd><p>Return projected genetic-value BLUPs.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>result</strong> (<a class="reference internal" href="#evo_lmm.FitResult" title="evo_lmm.results.FitResult"><em>FitResult</em></a>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="evo_lmm.prior_from_coordinates">
+<span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">prior_from_coordinates</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinates</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">sigma_b2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.prior_from_coordinates" title="Link to this definition">#</a></dt>
+<dd><p>Construct a unit/profiled prior and <code class="docutils literal notranslate"><span class="pre">delta</span></code> from optimizer coordinates.</p>
+<p>The returned prior has the supplied <code class="docutils literal notranslate"><span class="pre">sigma_b2</span></code> and coordinates are
+<code class="docutils literal notranslate"><span class="pre">(log_delta,</span> <span class="pre">log_tau[,</span> <span class="pre">logit_r])</span></code>.  Exact boundary values are supported
+by allowing infinite transformed coordinates.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<em>str</em>)</p></li>
+<li><p><strong>coordinates</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>sigma_b2</strong> (<em>float</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>tuple[<a class="reference internal" href="#evo_lmm.EvolutionaryPrior" title="evo_lmm.priors.EvolutionaryPrior"><em>EvolutionaryPrior</em></a>, float]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="evo_lmm.prior_from_parameters">
+<span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">prior_from_parameters</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">sigma_b2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tau</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rho</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.prior_from_parameters" title="Link to this definition">#</a></dt>
+<dd><p>Create a prior from scientific parameters with an explicit model name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model</strong> (<em>str</em>)</p></li>
+<li><p><strong>sigma_b2</strong> (<em>float</em>)</p></li>
+<li><p><strong>tau</strong> (<em>float</em>)</p></li>
+<li><p><strong>rho</strong> (<em>float</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#evo_lmm.EvolutionaryPrior" title="evo_lmm.priors.EvolutionaryPrior"><em>EvolutionaryPrior</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="evo_lmm.restricted_log_likelihood">
+<span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">restricted_log_likelihood</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">covariance</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">covariates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_constant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.restricted_log_likelihood" title="Link to this definition">#</a></dt>
+<dd><p>Evaluate the exact restricted log likelihood for a dense covariance.</p>
+<p><code class="docutils literal notranslate"><span class="pre">covariance</span></code> is the full <code class="docutils literal notranslate"><span class="pre">V</span></code> matrix.  The profiled form used by the
+fitter is obtained by passing <code class="docutils literal notranslate"><span class="pre">scale=1</span></code> and profiling that scale outside
+this function.  A fixed intercept is used when covariates are omitted.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>y</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>covariance</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>covariates</strong> (<em>ndarray</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>scale</strong> (<em>float</em>)</p></li>
+<li><p><strong>include_constant</strong> (<em>bool</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="evo_lmm.sample_allele_frequencies">
+<span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">sample_allele_frequencies</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grg</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_filter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">adjust_missing</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.sample_allele_frequencies" title="Link to this definition">#</a></dt>
+<dd><p>Extract sample allele frequencies from a GRGL-backed chromosome.</p>
+<p><code class="docutils literal notranslate"><span class="pre">sample_filter</span></code> is expressed in individual indices, matching GRAPP’s raw
+genotype operators.  Missing alleles are excluded from the denominator by
+default, so the result remains a sample frequency rather than an imputed
+dosage frequency.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>grg</strong> (<em>Any</em>)</p></li>
+<li><p><strong>sample_filter</strong> (<em>Sequence</em><em>[</em><em>int</em><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>adjust_missing</strong> (<em>bool</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="evo_lmm.simulate_grg_lmm">
+<span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">simulate_grg_lmm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prior</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_individuals</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">24</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sequence_length</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">population_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">recombination_rate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-08</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mutation_rate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2e-07</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">residual_variance</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.4</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">7</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#evo_lmm.simulate_grg_lmm" title="Link to this definition">#</a></dt>
+<dd><p>Simulate a diploid tree sequence, convert it to a GRG, and draw a trait.</p>
+<p>The returned <code class="docutils literal notranslate"><span class="pre">effects</span></code> are raw-dosage SNP effects sampled independently
+as <code class="docutils literal notranslate"><span class="pre">Normal(0,</span> <span class="pre">prior.effect_variances(frequencies))</span></code>.  The genetic value
+is computed by the GRG-backed raw operator and projected off the intercept,
+matching the fitting boundary used by <a class="reference internal" href="#evo_lmm.fit_evolutionary_bolt_lmm" title="evo_lmm.fit_evolutionary_bolt_lmm"><code class="xref py py-func docutils literal notranslate"><span class="pre">fit_evolutionary_bolt_lmm()</span></code></a>.</p>
+<p>The temporary <code class="docutils literal notranslate"><span class="pre">.trees</span></code> file is removed after GRGL conversion.  The GRG
+object and original in-memory tree sequence remain available in the result.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>prior</strong> (<a class="reference internal" href="#evo_lmm.EvolutionaryPrior" title="evo_lmm.priors.EvolutionaryPrior"><em>EvolutionaryPrior</em></a>)</p></li>
+<li><p><strong>n_individuals</strong> (<em>int</em>)</p></li>
+<li><p><strong>sequence_length</strong> (<em>float</em>)</p></li>
+<li><p><strong>population_size</strong> (<em>float</em>)</p></li>
+<li><p><strong>recombination_rate</strong> (<em>float</em>)</p></li>
+<li><p><strong>mutation_rate</strong> (<em>float</em>)</p></li>
+<li><p><strong>residual_variance</strong> (<em>float</em>)</p></li>
+<li><p><strong>seed</strong> (<em>int</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#evo_lmm.GrgSimulation" title="evo_lmm.simulation.GrgSimulation"><em>GrgSimulation</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<section id="priors">
+<h2>Priors<a class="headerlink" href="#priors" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">SimplifiedPrior</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sigma_b2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tau</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Bases: <a class="reference internal" href="#evo_lmm.EvolutionaryPrior" title="evo_lmm.priors.EvolutionaryPrior"><code class="xref py py-class docutils literal notranslate"><span class="pre">EvolutionaryPrior</span></code></a></p>
+<p>The exact <code class="docutils literal notranslate"><span class="pre">rho^2</span> <span class="pre">=</span> <span class="pre">1</span></code> evolutionary prior.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>sigma_b2</strong> (<em>float</em>) – Per-locus focal-trait effect variance on raw dosage units.</p></li>
+<li><p><strong>tau</strong> (<em>float</em>) – Non-negative <code class="docutils literal notranslate"><span class="pre">sigma_a^2</span> <span class="pre">/</span> <span class="pre">W_S</span></code> aggregate.  <code class="docutils literal notranslate"><span class="pre">tau=0</span></code> is the
+frequency-independent boundary and is useful for tests and diagnostics.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">FullPrior</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sigma_b2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tau</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rho</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Bases: <a class="reference internal" href="#evo_lmm.EvolutionaryPrior" title="evo_lmm.priors.EvolutionaryPrior"><code class="xref py py-class docutils literal notranslate"><span class="pre">EvolutionaryPrior</span></code></a></p>
+<p>The full evolutionary prior with identifiable coupling <code class="docutils literal notranslate"><span class="pre">rho^2</span></code>.</p>
+<p>Only <code class="docutils literal notranslate"><span class="pre">rho^2</span></code> appears in the conditional variance, so the sign of <code class="docutils literal notranslate"><span class="pre">rho</span></code>
+is not identifiable.  The public parameter accepts <code class="docutils literal notranslate"><span class="pre">-1</span> <span class="pre">&lt;=</span> <span class="pre">rho</span> <span class="pre">&lt;=</span> <span class="pre">1</span></code> and
+the optimizer works directly with <code class="docutils literal notranslate"><span class="pre">r</span> <span class="pre">=</span> <span class="pre">rho^2</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>sigma_b2</strong> (<em>float</em>)</p></li>
+<li><p><strong>tau</strong> (<em>float</em>)</p></li>
+<li><p><strong>rho</strong> (<em>float</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="operators-and-data-boundaries">
+<h2>Operators and data boundaries<a class="headerlink" href="#operators-and-data-boundaries" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">EvolutionaryLmmOps</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chromosomes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frequencies</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">covariates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_filter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'simplified'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mutation_filter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Matrix-free projected raw-dosage operators for evolutionary LMMs.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>chromosomes</strong> (<em>Any</em>) – An <code class="docutils literal notranslate"><span class="pre">(N,</span> <span class="pre">M)</span></code> dense dosage matrix, a mapping of chromosome labels to
+matrices/GRGs, or a sequence of matrices/<code class="docutils literal notranslate"><span class="pre">(label,</span> <span class="pre">source)</span></code> pairs.</p></li>
+<li><p><strong>frequencies</strong> (<em>Any</em>) – Sample allele frequencies, supplied as one vector, one vector per
+chromosome, or a mapping.  GRG inputs may omit this and extract them
+through GRAPP’s frequency traversal.</p></li>
+<li><p><strong>covariates</strong> (<em>np.ndarray</em><em> | </em><em>None</em>) – Fixed-effect design.  An intercept is added when absent and the basis
+is QR-orthonormalised once.</p></li>
+<li><p><strong>model</strong> (<em>str</em>) – Coordinate interpretation for transformed <code class="docutils literal notranslate"><span class="pre">phi</span></code> arrays.</p></li>
+<li><p><strong>sample_filter</strong> (<em>Sequence</em><em>[</em><em>int</em><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>mutation_filter</strong> (<em>Mapping</em><em>[</em><em>Any</em><em>, </em><em>Sequence</em><em>[</em><em>int</em><em>]</em><em>] </em><em>| </em><em>None</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">from_dense</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">genotypes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frequencies</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">covariates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">chrom_labels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'simplified'</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Convenience constructor for dense tests and small simulations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>genotypes</strong> (<em>ndarray</em><em> | </em><em>Sequence</em><em>[</em><em>ndarray</em><em>]</em>)</p></li>
+<li><p><strong>frequencies</strong> (<em>ndarray</em><em> | </em><em>Sequence</em><em>[</em><em>ndarray</em><em>]</em>)</p></li>
+<li><p><strong>covariates</strong> (<em>ndarray</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>chrom_labels</strong> (<em>Sequence</em><em>[</em><em>Any</em><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>model</strong> (<em>str</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#evo_lmm.EvolutionaryLmmOps" title="evo_lmm.operators.EvolutionaryLmmOps"><em>EvolutionaryLmmOps</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">apply_model_x</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">weights</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">theta</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_chrom</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Apply <code class="docutils literal notranslate"><span class="pre">P_C</span> <span class="pre">X</span> <span class="pre">diag(weights)</span></code> to variant coefficients.</p>
+<p><code class="docutils literal notranslate"><span class="pre">weights</span></code> is normally a vector of model coefficients.  When <code class="docutils literal notranslate"><span class="pre">theta</span></code>
+is a prior, it applies the model operator <code class="docutils literal notranslate"><span class="pre">P_C</span> <span class="pre">X</span> <span class="pre">diag(sqrt(w(theta)))</span></code>
+to those coefficients.  A raw coefficient vector or chromosome mapping
+may also be supplied without <code class="docutils literal notranslate"><span class="pre">theta</span></code>.  This method deliberately
+contains no sample-standardisation or <code class="docutils literal notranslate"><span class="pre">1/M</span></code> normalization.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>weights</strong> (<em>ndarray</em><em> | </em><em>Mapping</em><em>[</em><em>Any</em><em>, </em><em>ndarray</em><em>] </em><em>| </em><a class="reference internal" href="#evo_lmm.EvolutionaryPrior" title="evo_lmm.priors.EvolutionaryPrior"><em>EvolutionaryPrior</em></a>)</p></li>
+<li><p><strong>theta</strong> (<em>Any</em>)</p></li>
+<li><p><strong>exclude_chrom</strong> (<em>Any</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">model_scores</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vector</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">theta</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_chrom</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Return model scores, optionally for <code class="docutils literal notranslate"><span class="pre">B_theta^T</span> <span class="pre">=</span> <span class="pre">diag(sqrt(w))X^T</span> <span class="pre">P_C</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>vector</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>theta</strong> (<em>Any</em>)</p></li>
+<li><p><strong>exclude_chrom</strong> (<em>Any</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">apply_k</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vector</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">theta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_chrom</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Apply <code class="docutils literal notranslate"><span class="pre">K</span> <span class="pre">=</span> <span class="pre">P_C</span> <span class="pre">X</span> <span class="pre">diag(w(theta))</span> <span class="pre">X^T</span> <span class="pre">P_C</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>vector</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>theta</strong> (<em>Any</em>)</p></li>
+<li><p><strong>exclude_chrom</strong> (<em>Any</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">apply_dk</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vector</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">theta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameter</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_chrom</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Apply a first derivative of <code class="docutils literal notranslate"><span class="pre">K</span></code> in a transformed shape coordinate.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>vector</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>theta</strong> (<em>Any</em>)</p></li>
+<li><p><strong>parameter</strong> (<em>str</em>)</p></li>
+<li><p><strong>exclude_chrom</strong> (<em>Any</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">apply_h</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vector</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phi</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_chrom</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Apply the projected shape matrix <code class="docutils literal notranslate"><span class="pre">H</span> <span class="pre">=</span> <span class="pre">K</span> <span class="pre">+</span> <span class="pre">delta</span> <span class="pre">I</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>vector</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>phi</strong> (<em>Any</em>)</p></li>
+<li><p><strong>exclude_chrom</strong> (<em>Any</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">apply_dh</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vector</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phi</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameter</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_chrom</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Apply a first derivative of <code class="docutils literal notranslate"><span class="pre">H</span></code> in <code class="docutils literal notranslate"><span class="pre">log_delta</span></code>, <code class="docutils literal notranslate"><span class="pre">log_tau</span></code>, or <code class="docutils literal notranslate"><span class="pre">logit_r</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>vector</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>phi</strong> (<em>Any</em>)</p></li>
+<li><p><strong>parameter</strong> (<em>str</em>)</p></li>
+<li><p><strong>exclude_chrom</strong> (<em>Any</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">solve_ph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rhs_columns</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phi</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_chrom</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-09</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_iter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Solve projected <code class="docutils literal notranslate"><span class="pre">H</span> <span class="pre">z</span> <span class="pre">=</span> <span class="pre">P_C</span> <span class="pre">rhs</span></code> for one or many right-hand sides.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>rhs_columns</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>phi</strong> (<em>Any</em>)</p></li>
+<li><p><strong>exclude_chrom</strong> (<em>Any</em>)</p></li>
+<li><p><strong>tol</strong> (<em>float</em>)</p></li>
+<li><p><strong>max_iter</strong> (<em>int</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>initial</strong> (<em>ndarray</em><em> | </em><em>None</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">test_scores</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chrom</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vector</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Return BOLT-normalised test-genotype scores for one chromosome.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>chrom</strong> (<em>Any</em>)</p></li>
+<li><p><strong>vector</strong> (<em>ndarray</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">test_column</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chrom</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">local_idx</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Return one projected, BOLT-normalised test-genotype column.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>chrom</strong> (<em>Any</em>)</p></li>
+<li><p><strong>local_idx</strong> (<em>int</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">local_indices</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chrom</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Return mutation identifiers for a chromosome in operator order.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>chrom</strong> (<em>Any</em>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">kernel_trace</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">theta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_chrom</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Return <code class="docutils literal notranslate"><span class="pre">tr(P_C</span> <span class="pre">K</span> <span class="pre">P_C)</span></code> without constructing a dense kernel.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>theta</strong> (<em>Any</em>)</p></li>
+<li><p><strong>exclude_chrom</strong> (<em>Any</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">dense_kernel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">theta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_chrom</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Materialise a kernel for a small dense input or a test oracle.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>theta</strong> (<em>Any</em>)</p></li>
+<li><p><strong>exclude_chrom</strong> (<em>Any</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">VariantData</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frequencies</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">local_idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">raw_norm2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">centered_norm2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Cached per-variant information used by an evolutionary operator.</p>
+<p><code class="docutils literal notranslate"><span class="pre">frequencies</span></code> are sample allele frequencies and <code class="docutils literal notranslate"><span class="pre">local_idx</span></code> are the
+mutation identifiers in the source chromosome.  <code class="docutils literal notranslate"><span class="pre">raw_norm2</span></code> and
+<code class="docutils literal notranslate"><span class="pre">centered_norm2</span></code> are optional because GRGL operators can obtain them via
+graph traversals when needed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>frequencies</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>local_idx</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>raw_norm2</strong> (<em>ndarray</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>centered_norm2</strong> (<em>ndarray</em><em> | </em><em>None</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="fitting-results">
+<h2>Fitting results<a class="headerlink" href="#fitting-results" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">FitResult</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prior</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sigma_b2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sigma_e2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">h2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_likelihood</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fixed_effects</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">projected_phenotype</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ph_y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">diagnostics</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ops</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Scientific-scale fit result for an evolutionary LMM.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>prior</strong> (<a class="reference internal" href="#evo_lmm.EvolutionaryPrior" title="evo_lmm.priors.EvolutionaryPrior"><em>EvolutionaryPrior</em></a>)</p></li>
+<li><p><strong>sigma_b2</strong> (<em>float</em>)</p></li>
+<li><p><strong>sigma_e2</strong> (<em>float</em>)</p></li>
+<li><p><strong>delta</strong> (<em>float</em>)</p></li>
+<li><p><strong>h2</strong> (<em>float</em>)</p></li>
+<li><p><strong>log_likelihood</strong> (<em>float</em>)</p></li>
+<li><p><strong>fixed_effects</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>projected_phenotype</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>ph_y</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>diagnostics</strong> (<a class="reference internal" href="#evo_lmm.FitDiagnostics" title="evo_lmm.results.FitDiagnostics"><em>FitDiagnostics</em></a>)</p></li>
+<li><p><strong>model</strong> (<em>str</em>)</p></li>
+<li><p><strong>ops</strong> (<em>Any</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py property">
+<dt class="sig sig-object py">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">sigma_g2</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span></dt>
+<dd><p>Compatibility alias; unlike GRAPP this is raw-effect <code class="docutils literal notranslate"><span class="pre">sigma_b2</span></code>.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">blup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span></dt>
+<dd><p>Return the projected genetic-value BLUP <code class="docutils literal notranslate"><span class="pre">sigma_b2</span> <span class="pre">K</span> <span class="pre">P_V</span> <span class="pre">y</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><em>ndarray</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">FitDiagnostics</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">converged</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">iterations</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">objective</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">score_norm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ai_condition</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ai_damping</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">accepted_step</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trace_estimator</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trace_probes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trace_standard_errors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cg_iterations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">random_seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">boundary_hits</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">warnings</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">()</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Numerical and identifiability diagnostics from a fit.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>converged</strong> (<em>bool</em>)</p></li>
+<li><p><strong>iterations</strong> (<em>int</em>)</p></li>
+<li><p><strong>objective</strong> (<em>float</em>)</p></li>
+<li><p><strong>score_norm</strong> (<em>float</em>)</p></li>
+<li><p><strong>ai_condition</strong> (<em>float</em>)</p></li>
+<li><p><strong>ai_damping</strong> (<em>float</em>)</p></li>
+<li><p><strong>accepted_step</strong> (<em>float</em>)</p></li>
+<li><p><strong>trace_estimator</strong> (<em>str</em>)</p></li>
+<li><p><strong>trace_probes</strong> (<em>int</em>)</p></li>
+<li><p><strong>trace_standard_errors</strong> (<em>dict</em><em>[</em><em>str</em><em>, </em><em>float</em><em>]</em>)</p></li>
+<li><p><strong>cg_iterations</strong> (<em>list</em><em>[</em><em>int</em><em>]</em>)</p></li>
+<li><p><strong>random_seed</strong> (<em>int</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>boundary_hits</strong> (<em>tuple</em><em>[</em><em>str</em><em>, </em><em>...</em><em>]</em>)</p></li>
+<li><p><strong>warnings</strong> (<em>tuple</em><em>[</em><em>str</em><em>, </em><em>...</em><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">evo_lmm.</span></span><span class="sig-name descname"><span class="pre">AssociationResult</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chrom</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">local_idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">score</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">beta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">se</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chisq</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pvalue</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Compact BOLT-compatible association output for one chromosome block.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>chrom</strong> (<em>Any</em>)</p></li>
+<li><p><strong>local_idx</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>score</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>beta</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>se</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>chisq</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>pvalue</strong> (<em>ndarray</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Reference</p>
+      </div>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav id="pst-page-toc-nav" class="page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="pst-show_toc_level nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.AssociationResult"><code class="docutils literal notranslate"><span class="pre">AssociationResult</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.DenseREMLOracle"><code class="docutils literal notranslate"><span class="pre">DenseREMLOracle</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.EvolutionaryLmmOps"><code class="docutils literal notranslate"><span class="pre">EvolutionaryLmmOps</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.EvolutionaryLmmOps.from_dense"><code class="docutils literal notranslate"><span class="pre">EvolutionaryLmmOps.from_dense()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.EvolutionaryLmmOps.apply_model_x"><code class="docutils literal notranslate"><span class="pre">EvolutionaryLmmOps.apply_model_x()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.EvolutionaryLmmOps.model_scores"><code class="docutils literal notranslate"><span class="pre">EvolutionaryLmmOps.model_scores()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.EvolutionaryLmmOps.apply_k"><code class="docutils literal notranslate"><span class="pre">EvolutionaryLmmOps.apply_k()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.EvolutionaryLmmOps.apply_dk"><code class="docutils literal notranslate"><span class="pre">EvolutionaryLmmOps.apply_dk()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.EvolutionaryLmmOps.apply_h"><code class="docutils literal notranslate"><span class="pre">EvolutionaryLmmOps.apply_h()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.EvolutionaryLmmOps.apply_dh"><code class="docutils literal notranslate"><span class="pre">EvolutionaryLmmOps.apply_dh()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.EvolutionaryLmmOps.solve_ph"><code class="docutils literal notranslate"><span class="pre">EvolutionaryLmmOps.solve_ph()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.EvolutionaryLmmOps.test_scores"><code class="docutils literal notranslate"><span class="pre">EvolutionaryLmmOps.test_scores()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.EvolutionaryLmmOps.test_column"><code class="docutils literal notranslate"><span class="pre">EvolutionaryLmmOps.test_column()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.EvolutionaryLmmOps.local_indices"><code class="docutils literal notranslate"><span class="pre">EvolutionaryLmmOps.local_indices()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.EvolutionaryLmmOps.kernel_trace"><code class="docutils literal notranslate"><span class="pre">EvolutionaryLmmOps.kernel_trace()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.EvolutionaryLmmOps.dense_kernel"><code class="docutils literal notranslate"><span class="pre">EvolutionaryLmmOps.dense_kernel()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.EvolutionaryPrior"><code class="docutils literal notranslate"><span class="pre">EvolutionaryPrior</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.EvolutionaryPrior.coordinates"><code class="docutils literal notranslate"><span class="pre">EvolutionaryPrior.coordinates()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.FitDiagnostics"><code class="docutils literal notranslate"><span class="pre">FitDiagnostics</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.FitResult"><code class="docutils literal notranslate"><span class="pre">FitResult</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.FitResult.sigma_g2"><code class="docutils literal notranslate"><span class="pre">FitResult.sigma_g2</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.FitResult.blup"><code class="docutils literal notranslate"><span class="pre">FitResult.blup()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.FullPrior"><code class="docutils literal notranslate"><span class="pre">FullPrior</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.SimplifiedPrior"><code class="docutils literal notranslate"><span class="pre">SimplifiedPrior</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.GrgSimulation"><code class="docutils literal notranslate"><span class="pre">GrgSimulation</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.VariantData"><code class="docutils literal notranslate"><span class="pre">VariantData</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.allele_frequency_q"><code class="docutils literal notranslate"><span class="pre">allele_frequency_q()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.association"><code class="docutils literal notranslate"><span class="pre">association()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.dense_variant_data"><code class="docutils literal notranslate"><span class="pre">dense_variant_data()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.exact_average_information"><code class="docutils literal notranslate"><span class="pre">exact_average_information()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.exact_reml_score"><code class="docutils literal notranslate"><span class="pre">exact_reml_score()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.fit_dense_reml"><code class="docutils literal notranslate"><span class="pre">fit_dense_reml()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.fit_evolutionary_bolt_lmm"><code class="docutils literal notranslate"><span class="pre">fit_evolutionary_bolt_lmm()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.fit_evolutionary_bolt"><code class="docutils literal notranslate"><span class="pre">fit_evolutionary_bolt()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.fit_evolutionary_reml"><code class="docutils literal notranslate"><span class="pre">fit_evolutionary_reml()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.fit_evolutionary_lmm"><code class="docutils literal notranslate"><span class="pre">fit_evolutionary_lmm()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.fit_reml"><code class="docutils literal notranslate"><span class="pre">fit_reml()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.exact_reml_loglikelihood"><code class="docutils literal notranslate"><span class="pre">exact_reml_loglikelihood()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.profiled_average_information"><code class="docutils literal notranslate"><span class="pre">profiled_average_information()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.haseman_elston_initialization"><code class="docutils literal notranslate"><span class="pre">haseman_elston_initialization()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.grg_variant_data"><code class="docutils literal notranslate"><span class="pre">grg_variant_data()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.loco_solve"><code class="docutils literal notranslate"><span class="pre">loco_solve()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.loco_solutions"><code class="docutils literal notranslate"><span class="pre">loco_solutions()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.predict_blup"><code class="docutils literal notranslate"><span class="pre">predict_blup()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.prior_from_coordinates"><code class="docutils literal notranslate"><span class="pre">prior_from_coordinates()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.prior_from_parameters"><code class="docutils literal notranslate"><span class="pre">prior_from_parameters()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.restricted_log_likelihood"><code class="docutils literal notranslate"><span class="pre">restricted_log_likelihood()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.sample_allele_frequencies"><code class="docutils literal notranslate"><span class="pre">sample_allele_frequencies()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evo_lmm.simulate_grg_lmm"><code class="docutils literal notranslate"><span class="pre">simulate_grg_lmm()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#priors">Priors</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#operators-and-data-boundaries">Operators and data boundaries</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#fitting-results">Fitting results</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../_sources/reference/public_api.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=90905a2f556bf617f1a9"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=90905a2f556bf617f1a9"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2026, evo-lmm contributors.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.20.0.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

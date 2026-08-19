@@ -28,7 +28,10 @@ grapp = { path = "grapp", editable = true }
 
 [dependency-groups]
 dev = [
+    "matplotlib>=3.11.1",
+    "pydata-sphinx-theme>=0.20.0",
     "pytest>=8.3",
+    "sphinx>=9.1.0",
 ]
 
 [tool.pytest.ini_options]
