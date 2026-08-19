@@ -29,8 +29,10 @@ including fits that land near the ``tau=0`` boundary.
 Replicate estimates
 -------------------
 
-.. plot:: tutorials/variance_components.py
-   :context: reset
+The result below is a pre-generated local asset. The source remains available
+above, but ReadTheDocs does not need to rerun the ten-replicate fit.
+
+.. image:: ../_static/generated/variance_components.png
    :alt: Box plots of evolutionary variance component estimates across ten replicates
 
 The box plot is a compact Monte Carlo diagnostic, not a replacement for

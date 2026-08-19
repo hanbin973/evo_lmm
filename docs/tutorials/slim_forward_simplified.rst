@@ -52,13 +52,15 @@ driver:
    :language: slim
    :linenos:
 
-It simulates 1,000 diploid individuals for ``4N = 4,000`` generations,
-records the tree sequence, and stores the m2 selection coefficients in its
-mutation metadata. Here ``V_S = 2N = 2,000`` and therefore ``W_S = 1``.
+It simulates 2,000 diploid individuals for ``4N = 8,000`` generations across
+``L = 10^6`` bases, records the tree sequence, and stores the m2 selection
+coefficients in its mutation metadata. Here ``V_S = 2N = 4,000`` and
+therefore ``W_S = 1``.
 The production paper
 scripts separate burn-in and replicate runs; this documentation version
 combines the essential steps so that one command produces the data consumed
-by the GRG-backed fit.
+by the GRG-backed fit. The checked-in figure was generated locally so hosted
+documentation builds do not rerun this compute-heavy workflow.
 
 SLiM to GRG to evo-lmm
 ----------------------
@@ -106,6 +108,10 @@ panel shows box plots of the fitted variance components across all ten
 replicates. The dotted line segment at each parameter position marks that
 component's generating value; the right panel uses a linear y-axis.
 
-.. plot:: tutorials/slim_forward_simplified.py
-   :context: reset
+The result below is a pre-generated local asset. This keeps hosted
+documentation builds from rerunning the 2,000-individual SLiM simulation and
+the ten GRG-backed fits. Regenerate it, together with the other tutorial
+figures, from the repository root with ``uv run python docs/generate_figures.py``.
+
+.. image:: ../_static/generated/slim_forward_simplified.png
    :alt: Forward-simulation effect spectrum and fitted simplified prior summary

@@ -277,9 +277,7 @@ def _quantities(
     for index, name in enumerate(names):
         derivative_vectors.append(ops.apply_dh(ph_y, coordinates, name, exclude_chrom))
         data_quad = float(ph_y @ derivative_vectors[-1])
-        applied = np.column_stack(
-            [ops.apply_dh(probes[:, col], coordinates, name, exclude_chrom) for col in range(probes.shape[1])]
-        )
+        applied = ops.apply_dh_matmat(probes, coordinates, name, exclude_chrom)
         trace_samples = np.sum(ph_probes * applied, axis=0)
         trace = float(np.mean(trace_samples))
         trace_errors[name] = float(np.std(trace_samples, ddof=1) / np.sqrt(trace_samples.size)) if trace_samples.size > 1 else 0.0

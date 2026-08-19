@@ -87,10 +87,9 @@ def make_box_plot(results: np.ndarray) -> plt.Figure:
     return figure
 
 
-results = run_replicates()
-figure = make_box_plot(results)
-
 if __name__ == "__main__":
+    results = run_replicates()
+    figure = make_box_plot(results)
     print("converged replicates:", int(np.count_nonzero(results[:, 3])))
     print(results[:, :3])
     if "agg" not in plt.get_backend().lower():

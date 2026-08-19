@@ -17,7 +17,7 @@ import tskit
 from evo_lmm import (
     EvolutionaryLmmOps,
     SimplifiedPrior,
-    fit_evolutionary_bolt_lmm,
+    fit_reml,
     sample_allele_frequencies,
 )
 from evo_lmm.grapp_backend import wrap_grg
@@ -49,6 +49,12 @@ from slim_forward_simplified import (  # noqa: E402
 
 MAF_THRESHOLDS = np.array([0.001, 0.01, 0.1, 0.2, 0.3, 0.4, 0.5])
 N_FORWARD_BLOCKS = 2
+# Match GRAPP's numerical work budget.  At N=2,000 its automatic Monte Carlo
+# rule selects 15 trials and its public BOLT driver defaults to this CG
+# tolerance.  Using 64 probes and 1e-8 here measures a different accuracy
+# target rather than the overhead of the evolutionary kernel.
+TRACE_PROBES = 15
+CG_TOL = 5e-4
 
 
 @dataclass(frozen=True)
@@ -62,6 +68,8 @@ class BenchmarkData:
     phenotype: np.ndarray
     blocks: tuple[tuple[str, Any], ...]
     block_frequencies: dict[str, np.ndarray]
+    bolt_blocks: tuple[tuple[str, Any], ...]
+    bolt_block_frequencies: dict[str, np.ndarray]
 
 
 @dataclass(frozen=True)
@@ -102,6 +110,34 @@ def _split_forward_tree_sequence(
         grg = pygrgl.grg_from_trees(str(block_path), compute_coals=True)
         blocks.append((f"block-{index}", grg))
     return tuple(blocks)
+
+
+def _make_bolt_blocks(
+    blocks: tuple[tuple[str, Any], ...],
+    block_frequencies: dict[str, np.ndarray],
+    output_directory: Path,
+) -> tuple[tuple[tuple[str, Any], ...], dict[str, np.ndarray]]:
+    """Remove fixed columns before GRAPP's standardized-GRM calibration."""
+
+    bolt_blocks: list[tuple[str, Any]] = []
+    bolt_frequencies: dict[str, np.ndarray] = {}
+    for label, grg in blocks:
+        frequencies = block_frequencies[label]
+        selected = np.flatnonzero(frequencies * (1.0 - frequencies) > 0.0)
+        if selected.size == 0:
+            raise RuntimeError(f"forward block {label} has no segregating variants")
+        bolt_path = output_directory / f"{label}.segregating.grg"
+        if not pygrgl.save_subset(
+            grg,
+            str(bolt_path),
+            pygrgl.TraversalDirection.DOWN,
+            selected.tolist(),
+        ):
+            raise RuntimeError(f"could not write segregating GRG for {label}")
+        bolt_grg = pygrgl.load_immutable_grg(str(bolt_path))
+        bolt_blocks.append((label, bolt_grg))
+        bolt_frequencies[label] = sample_allele_frequencies(bolt_grg)
+    return tuple(bolt_blocks), bolt_frequencies
 
 
 def simulate_forward_data(seed: int = SEED) -> BenchmarkData:
@@ -152,6 +188,11 @@ def simulate_forward_data(seed: int = SEED) -> BenchmarkData:
         block_frequencies = {
             label: sample_allele_frequencies(grg) for label, grg in blocks
         }
+        bolt_blocks, bolt_block_frequencies = _make_bolt_blocks(
+            blocks,
+            block_frequencies,
+            output_directory,
+        )
         concatenated_frequencies = np.concatenate(
             [block_frequencies[label] for label, _ in blocks]
         )
@@ -165,6 +206,8 @@ def simulate_forward_data(seed: int = SEED) -> BenchmarkData:
             phenotype=phenotype,
             blocks=blocks,
             block_frequencies=block_frequencies,
+            bolt_blocks=bolt_blocks,
+            bolt_block_frequencies=bolt_block_frequencies,
         )
 
 
@@ -175,15 +218,21 @@ def run_benchmark(seed: int = SEED) -> BenchmarkResult:
     initial = SimplifiedPrior(sigma_b2=SIGMA_A2, tau=TRUE_TAU)
 
     start = time.perf_counter()
-    evo_fit = fit_evolutionary_bolt_lmm(
+    evo_ops = EvolutionaryLmmOps(
         data.blocks,
-        data.phenotype,
         frequencies=data.block_frequencies,
         model="simplified",
+    )
+    evo_fit = fit_reml(
+        evo_ops,
+        data.phenotype,
         initial=initial,
-        trace_probes=64,
-        max_iter=30,
-        cg_tol=1e-8,
+        trace_probes=TRACE_PROBES,
+        # GRAPP's secant search makes at most seven variance-component
+        # evaluations (two initial points plus five updates). Allow one extra
+        # AI-REML update while keeping optimizer work comparable.
+        max_iter=8,
+        cg_tol=CG_TOL,
         seed=seed + 2,
     )
     evo_seconds = time.perf_counter() - start
@@ -193,15 +242,18 @@ def run_benchmark(seed: int = SEED) -> BenchmarkResult:
     from grapp.assoc.bolt_inf_core import CovariateBasis
     from grapp.assoc.bolt_lmm import bolt_lmm_inf
 
-    grapp_blocks = [(label, wrap_grg(grg)) for label, grg in data.blocks]
+    grapp_blocks = [(label, wrap_grg(grg)) for label, grg in data.bolt_blocks]
     covariates = CovariateBasis.intercept_only(N_INDIVIDUALS)
     start = time.perf_counter()
     bolt_fit, _calibration, _residuals, bolt_stats = bolt_lmm_inf(
         grapp_blocks,
         data.phenotype,
         covariates,
+        mc_trials=TRACE_PROBES,
+        cg_tol=CG_TOL,
         seed=seed + 2,
         threads=1,
+        batched_apply_x=True,
     )
     bolt_seconds = time.perf_counter() - start
 

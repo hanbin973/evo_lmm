@@ -559,6 +559,40 @@ class EvolutionaryLmmOps:
             return self._delta(phi) * projected
         return self.apply_dk(projected, self._prior(phi), parameter, exclude_chrom)
 
+    def apply_dh_matmat(
+        self,
+        values: np.ndarray,
+        phi: Any,
+        parameter: str,
+        exclude_chrom: Any = None,
+    ) -> np.ndarray:
+        """Apply a first derivative of ``H`` to several columns at once.
+
+        This is the matrix-RHS counterpart of :meth:`apply_dh`. Keeping the
+        columns batched is important for GRG inputs: one ``matmat`` traversal
+        replaces one traversal per stochastic trace probe.
+        """
+
+        matrix = np.asarray(values, dtype=np.float64)
+        if matrix.ndim != 2 or matrix.shape[0] != self.n:
+            raise ValueError("values must have shape (n, k)")
+        projected = self.project(matrix)
+        if parameter == "log_delta":
+            return self._delta(phi) * projected
+
+        prior = self._prior(phi)
+        derivatives = prior.weight_derivatives(self.frequencies)
+        if parameter not in derivatives:
+            raise KeyError(f"prior has no derivative parameter {parameter!r}")
+        derivative_blocks = self._split_global(derivatives[parameter])
+        result = np.zeros_like(projected)
+        for chrom, derivative in zip(self._chromosomes, derivative_blocks):
+            if chrom.label == exclude_chrom:
+                continue
+            scores = self._raw_rmatmat(chrom, projected)
+            result += self._raw_matmat(chrom, scores * derivative[:, None])
+        return self.project(result)
+
     def solve_ph(
         self,
         rhs_columns: np.ndarray,

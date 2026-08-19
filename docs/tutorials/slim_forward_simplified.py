@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import subprocess
 import tempfile
@@ -11,12 +12,18 @@ import numpy as np
 import pygrgl
 import tskit
 
-from evo_lmm import EvolutionaryLmmOps, SimplifiedPrior, fit_evolutionary_bolt_lmm, sample_allele_frequencies
+from evo_lmm import (
+    EvolutionaryLmmOps,
+    SimplifiedPrior,
+    fit_evolutionary_bolt_lmm,
+    sample_allele_frequencies,
+)
 
 
-N_INDIVIDUALS = 1_000
+N_INDIVIDUALS = 2_000
 N_GENERATIONS = 4 * N_INDIVIDUALS
 N_REPLICATES = 10
+SEQUENCE_LENGTH = 1_000_000
 SIGMA_A2 = 1.0
 V_S = 2.0 * N_INDIVIDUALS
 W_S = V_S / (2.0 * N_INDIVIDUALS)
@@ -33,8 +40,8 @@ def run_slim(output_directory: Path, seed: int = SEED) -> Path:
     if "__file__" in globals():
         script = Path(__file__).with_name("slim_simplified_prior.slim")
     else:
-        # matplotlib's Sphinx plot directive executes a file without defining
-        # __file__. The repository-root path also works in a normal build.
+        # Keep this fallback for interactive execution from a source checkout.
+        # Hosted documentation uses the pre-generated PNG assets instead.
         script = Path("docs/tutorials/slim_simplified_prior.slim")
         if not script.exists():
             script = Path("slim_simplified_prior.slim")
@@ -44,6 +51,10 @@ def run_slim(output_directory: Path, seed: int = SEED) -> Path:
             "slim",
             "-s",
             str(seed),
+            "-d",
+            f"N={N_INDIVIDUALS}",
+            "-d",
+            f"L={SEQUENCE_LENGTH}",
             "-d",
             f'OUTPUT_FILE="{tree_path}"',
             "-d",
@@ -128,10 +139,19 @@ def simulate_and_fit(seed: int = SEED):
         }
 
 
-def run_replicates() -> list[dict]:
-    """Run independent SLiM replicates with deterministic seeds."""
+def run_replicates(workers: int = 1) -> list[dict]:
+    """Run independent SLiM replicates with deterministic seeds.
 
-    return [simulate_and_fit(SEED + replicate) for replicate in range(N_REPLICATES)]
+    ``workers=1`` preserves the simple sequential tutorial execution. Local
+    documentation generation may use a small thread pool because each
+    replicate owns its SLiM process and GRG objects.
+    """
+
+    seeds = [SEED + replicate for replicate in range(N_REPLICATES)]
+    if workers <= 1:
+        return [simulate_and_fit(seed) for seed in seeds]
+    with ThreadPoolExecutor(max_workers=int(workers)) as executor:
+        return list(executor.map(simulate_and_fit, seeds))
 
 
 def local_linear_regression(
