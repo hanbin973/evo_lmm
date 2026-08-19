@@ -27,6 +27,19 @@ def rademacher_probes(n: int, probes: int, seed: int) -> np.ndarray:
     return rng.choice(np.array([-1.0, 1.0]), size=(int(n), int(probes)))
 
 
+def spherical_gaussian_probes(n: int, probes: int, seed: int) -> np.ndarray:
+    """Return isotropic Gaussian columns normalized to radius ``sqrt(n)``."""
+
+    if n <= 0 or probes <= 0:
+        raise ValueError("n and probes must be positive")
+    rng = np.random.default_rng(int(seed))
+    values = rng.normal(size=(int(n), int(probes)))
+    norms = np.linalg.norm(values, axis=0)
+    if np.any(norms <= np.finfo(np.float64).tiny):
+        raise FloatingPointError("could not normalize a Gaussian probe")
+    return np.asarray(values * (np.sqrt(float(n)) / norms)[None, :], dtype=np.float64)
+
+
 def hutchinson_trace(
     apply: Callable[[np.ndarray], np.ndarray],
     probes: np.ndarray,
@@ -65,14 +78,71 @@ def xtrace(
     apply: Callable[[np.ndarray], np.ndarray],
     probes: np.ndarray,
 ) -> TraceEstimate:
-    """Optional XTrace-compatible entry point.
+    """Estimate a trace with the spherical TSLMM XTrace algorithm.
 
-    The first CPU implementation uses the same shared-probe estimator while
-    retaining the method label and API needed for later randomized-range
-    refinement.  It is exact for the small dense oracle when callers use
-    :func:`exact_trace` instead.
+    ``probes`` contains the spherical Gaussian test columns. XTrace uses two
+    operator query blocks, ``A @ probes`` and ``A @ Q``; keeping the columns
+    explicit lets REML reuse the same seeded vectors at every parameter point.
     """
 
-    estimate = hutchinson_trace(apply, probes)
-    return TraceEstimate(estimate.value, estimate.standard_error, "xtrace", estimate.probes)
+    omega = np.asarray(probes, dtype=np.float64)
+    if omega.ndim != 2 or omega.shape[1] < 2:
+        raise ValueError("XTrace requires a probe matrix with at least two columns")
+    n, m = omega.shape
+    norms = np.linalg.norm(omega, axis=0)
+    if not np.all(np.isfinite(omega)) or np.any(norms <= np.finfo(float).tiny):
+        raise ValueError("XTrace probes must be finite and nonzero")
+    if not np.allclose(norms, np.sqrt(float(n)), rtol=1e-10, atol=1e-10):
+        raise ValueError("XTrace probes must have spherical radius sqrt(n)")
 
+    def _apply(values: np.ndarray) -> np.ndarray:
+        result = np.asarray(apply(values), dtype=np.float64)
+        if result.shape != values.shape:
+            raise ValueError("trace operator returned a mismatched shape")
+        return result
+
+    y = _apply(omega)
+    q, r = np.linalg.qr(y, mode="reduced")
+    diagonal = np.abs(np.diag(r))
+    threshold = (diagonal.max() if diagonal.size else 0.0) * max(n, m) * np.finfo(float).eps
+    rank = int(np.count_nonzero(diagonal > threshold))
+    if rank < 2:
+        samples = np.sum(omega * y, axis=0)
+        error = float(np.std(samples, ddof=1) / np.sqrt(m))
+        return TraceEstimate(float(np.mean(samples)), error, "xtrace-rank-fallback", int(m))
+    if rank < m:
+        omega = omega[:, :rank]
+        y = y[:, :rank]
+        q, r = np.linalg.qr(y, mode="reduced")
+        m = rank
+
+    z = _apply(q)
+    w = q.T @ omega
+    # S = normalize(inv(R).T) without explicitly forming an inverse.
+    s = np.linalg.solve(r.T, np.eye(m, dtype=np.float64))
+    s = s / np.linalg.norm(s, axis=0)[None, :]
+
+    def diag_prod(left: np.ndarray, right: np.ndarray) -> np.ndarray:
+        return np.sum(left * right, axis=0)
+
+    h = q.T @ z
+    hw = h @ w
+    t = z.T @ omega
+    d_sw = diag_prod(s, w)
+    d_shs = diag_prod(s, h @ s)
+    d_tw = diag_prod(t, w)
+    d_whw = diag_prod(w, hw)
+    d_srmhw = diag_prod(s, r - hw)
+    d_tmhrs = diag_prod(t - h.T @ w, s)
+    denominator = n - np.linalg.norm(w, axis=0) ** 2 + np.abs(d_sw) ** 2
+    if np.any(denominator <= 0.0) or not np.all(np.isfinite(denominator)):
+        raise FloatingPointError("XTrace normalization denominator is non-positive")
+    scale = (float(n - m + 1) / denominator)
+    estimates = (
+        np.trace(h) - d_shs
+        + (d_whw - d_tw + d_tmhrs * d_sw + np.abs(d_sw) ** 2 * d_shs + d_sw * d_srmhw)
+        * scale
+    )
+    estimates = np.asarray(estimates, dtype=np.float64)
+    error = float(np.std(estimates, ddof=1) / np.sqrt(m)) if m > 1 else 0.0
+    return TraceEstimate(float(np.mean(estimates)), error, "xtrace", int(m))

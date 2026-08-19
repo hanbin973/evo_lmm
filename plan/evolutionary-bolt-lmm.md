@@ -187,7 +187,7 @@ src/evo_lmm/
 ├── grg_data.py        Frequency extraction, sample masks, variant eligibility
 ├── operators.py       Weighted model kernel and unweighted test operators
 ├── reml.py            Matrix-free average-information REML solver
-├── trace.py           Shared Hutchinson and optional XTrace estimators
+├── trace.py           Production XTrace and private reference estimators
 ├── bolt.py            End-to-end fit, LOCO solves, calibration, association
 ├── results.py         Typed fit diagnostics and association result objects
 └── grapp_backend.py   All imports/adaptation from the pinned GRAPP commit
@@ -407,16 +407,21 @@ theta_(k+1) = theta_k + step_k.
 Compute one iteration as follows:
 
 1. Build the current per-variant weights and first derivatives of `H`.
-2. Draw the trace probes once at fit initialization and keep them fixed. In one
-   synchronized multi-right-hand-side projected-CG batch, solve
+2. Draw the seeded base trace vectors once at fit initialization and keep them
+   fixed. Use independent Gaussian columns normalized onto the sphere of radius
+   `sqrt(N)`, matching TSLMM's XTrace implementation. Their distribution is
+   isotropic because each column has squared norm `N`. If the public API asks
+   for `L` probe vectors, XTrace has an even total operator-query budget
+   `m = 2L` (the `A Omega` and `A Q` blocks); diagnostics must report both
+   quantities. Separately solve the phenotype system
 
    ```text
-   P_C H P_C [xi, p_1, ..., p_L] = P_C [y, z_1, ..., z_L]
+   P_C H P_C xi = P_C y
    ```
 
-   subject to every solution column lying in the covariate-orthogonal
-   subspace. Thus `xi = P_H y` and `p_l = P_H z_l`. This is one batched GRGL
-   `matmat` per CG iteration, not `L+1` independent GRGL traversals.
+   subject to `xi` lying in the covariate-orthogonal subspace. Thus
+   `xi = P_H y`. The XTrace inverse systems are constructed in step 7 because
+   their right-hand sides depend on the derivative coordinate.
 3. Profile `sigma_b2 = (y^T xi)/d` and derive `sigma_e2`.
 4. For every full coordinate, including scale, compute `eta_i = V_i P_V y`.
    Equivalently use scale-free `H_i xi` and apply the required scalar factors
@@ -424,15 +429,28 @@ Compute one iteration as follows:
 5. In one second synchronized CG batch, compute all `zeta_i = P_H eta_i`.
 6. Form the data quadratics and full AI matrix from small inner products, then
    use the scale Schur complement to obtain `AI_profile`.
-7. Estimate every non-scale score trace from the already-solved common probes:
+7. Estimate every non-scale score trace with XTrace applied to
+   `A_i = P_H H_i`. For each coordinate, first form `Y_i = A_i Omega`, compute
+   the reduced QR factorization `Y_i = Q_i R_i`, then form `Z_i = A_i Q_i` and
+   apply TSLMM's exchangeable correction and spherical normalization. Use
+   batched derivative products and synchronized solves for both operator-query
+   blocks. Reuse the same seeded `Omega` for every coordinate and every REML
+   iteration so changes in the stochastic score reflect parameter changes, not
+   fresh Monte Carlo noise. The scale trace remains the exact value `d`.
 
    ```text
-   tr(P_H H_i) ~= (1 / L) * sum_l p_l^T (H_i z_l).
+   Omega[:, l] = sqrt(N) * g_l / ||g_l||_2,  g_l ~ Normal(0, I)
+   Y_i = A_i Omega
+   Q_i, R_i = qr(Y_i)
+   Z_i = A_i Q_i
+   tr(P_H H_i) ~= XTrace(Omega, Y_i, Q_i, R_i, Z_i).
    ```
 
-   This shares all inverse applications across parameters; each additional
-   evolutionary parameter costs derivative matvecs but no additional CG
-   solve. The scale trace is the exact value `d`.
+   XTrace requires two `A_i` query blocks per non-scale coordinate, so it does
+   not inherit Hutchinson's single common inverse batch across all derivatives.
+   Offset that cost by using fewer random columns for a target error and by
+   batching every column within a query block. Report per-coordinate empirical
+   standard errors from the exchangeable estimates.
 8. Form the profiled score, symmetrize `AI_profile`, add minimal diagonal
    damping if its condition
    number is poor, solve for the step, and cap the step in transformed
@@ -443,31 +461,59 @@ Compute one iteration as follows:
 Implement synchronized independent CG in the style used by TSLMM: all columns
 share one `H.matmat(search_directions)` call per iteration, while recurrence
 coefficients and residual tests remain per column. Remove converged columns
-from the active block rather than stopping on one Frobenius norm. Warm-start
-the phenotype, probe, and derivative solutions from the preceding accepted AI
-iterate and from the preceding step-halving trial.
+from the active block rather than stopping on one Frobenius norm.
 
-The complete AI iteration therefore has two sequential inverse stages: one for
-`[y, probes]` and one for all derivative right-hand sides. Its expensive GRGL
-traversal count depends primarily on CG iterations, not on the number of probes
-or fitted prior parameters. The score requires stochastic traces, but the AI
-matrix itself uses only first-derivative matvecs, the second CG batch, and small
-dense inner products. This is the computational benefit emphasized by Theorem
-6 and Algorithm 4 of the REML paper and realized with TSLMM-style batching.
+Warm starts are required, with explicit cache semantics:
+
+- Cache solved columns by inverse stage and stable RHS identity: phenotype,
+  each coordinate's XTrace range/correction columns, and derivative RHS
+  columns. Preserve column identity even when active-column compaction changes
+  the physical CG batch.
+- At a new AI point, initialize each matching column from the most recent
+  accepted point. Within a step-halving line search, initialize a child trial
+  from its immediately preceding finite trial because it is the nearest known
+  covariance. A rejected trial must never replace the accepted-point cache.
+- Derivative RHS and XTrace `Q_i` columns change with the parameters. Reuse
+  their previous solutions only when the coordinate name and column count
+  match; otherwise start the changed or unmatched columns at zero.
+- Always project a cached initial guess, recompute its true residual under the
+  current `H`, and apply the ordinary per-column convergence test. A warm start
+  is an initial guess only: it must not loosen `cg_tol`, skip residual checks,
+  or alter the converged solution.
+- If a cached guess is non-finite, has the wrong shape, or produces a larger
+  initial residual than the projected zero guess, discard it for that column.
+  Record warm-start hits, rejected guesses, initial/final residuals, and CG
+  iterations by stage so the performance effect is measurable.
+
+The complete AI iteration has a phenotype solve, a batched derivative-RHS
+solve for the AI matrix, and two batched XTrace query solves per non-scale
+coordinate. Its expensive GRGL traversal count therefore depends on CG
+iterations, fitted coordinates, and the XTrace query budget. The AI matrix
+itself remains deterministic and uses only first-derivative matvecs, the
+derivative solve, and small dense inner products; only the score traces are
+stochastic.
 
 Stop when both the maximum transformed-parameter step and the Fisher-scaled
-score norm are below tolerance. Record the random seed, trace-probe count, CG
+score norm are below tolerance. Record the random seed, XTrace query budget, CG
 tolerance and iterations, AI condition number/damping, accepted step length,
-score norm, active RHS count, and boundary hits. Increase the fixed probe count
-and retry when trace Monte Carlo error prevents score convergence.
+score norm, active RHS count, and boundary hits. Increase the fixed even query
+budget and retry when trace Monte Carlo error prevents score convergence.
 
-Use shared-probe Hutchinson as the default because it amortizes every `P_H`
-solve across all derivative traces. Also implement TSLMM's XTrace strategy as
-an optional high-accuracy mode. XTrace uses two operator-query blocks to build
-and correct a randomized range approximation; enable it only when a pilot
-comparison shows that it reaches the requested trace error with fewer total
-weighted-GRGL matvec equivalents than shared Hutchinson. Report the estimator
-and its empirical standard error.
+Use shared-probe Hutchinson as the production default because it amortizes
+every `P_H` solve across all derivative traces. Keep TSLMM-style XTrace as an
+explicit configurable alternative for experiments and high-accuracy
+workloads. Follow the algorithm and query-budget convention in
+[`tslmm/trace_estimators.py`](https://github.com/hanbin973/tslmm/blob/main/tslmm/trace_estimators.py),
+validated against the exchangeable estimator in the XTrace paper. XTrace must
+use spherical Gaussian columns, a numerically stable reduced
+QR, solve-based linear algebra rather than an explicit inverse where practical,
+and a rank-deficiency fallback that removes dependent range columns while
+retaining a valid error estimate. Require `m >= 4`, reject `m >= 2N` unless the
+dense exact path is selected, and report the estimator, random-column count,
+total operator-query budget, effective range rank, and empirical standard
+error. Select XTrace's query budget from end-to-end error-versus-time
+benchmarks; do not assume that equal `m` values mean equal work for
+Hutchinson and XTrace.
 
 Implement an exact dense REML oracle for small test data using
 
@@ -489,7 +535,7 @@ Adopt the applicable techniques from
   numerical fitting; transform variance estimates and fixed effects back to
   original units in the result.
 - Use synchronized multi-RHS CG so one GRGL `matmat` advances all RHS columns.
-- Reuse `P_H y`, fixed trace probes, derivative products, and warm starts
+- Reuse `P_H y`, fixed spherical base vectors, derivative products, and warm starts
   throughout an accepted AI iteration.
 - Profile the global covariance scale instead of estimating a redundant scale
   coordinate stochastically.
@@ -583,25 +629,30 @@ every LOCO kernel match dense multiplication.
 ### Phase 3 - matrix-free REML
 
 - Implement matrix-free `P_H` actions with synchronized projected CG, including
-  active-column convergence and warm starts.
-- Batch `[y, trace_probes]` in the first inverse stage and every derivative RHS
-  in the second stage.
+  active-column convergence and the accepted/trial cache semantics above.
+- Batch the phenotype, both XTrace operator-query blocks, and every derivative
+  RHS stage; warm-start only columns with stable logical identities.
 - Profile `sigma_b2`, derive `sigma_e2`, and eliminate the scale coordinate
   from AI with a Schur complement.
-- Implement exact data quadratics, Hutchinson score traces with fixed common
-  probes, optional XTrace, and the nonlinear average-information matrix from
-  Theorem 6.
+- Implement exact data quadratics, fixed-probe Hutchinson score traces as the
+  default, optional spherical TSLMM-style XTrace score traces, and the
+  nonlinear average-information matrix from Theorem 6.
 - Add stochastic Haseman-Elston initialization.
 - Add transformed-parameter AI updates, condition-based damping, step capping,
   score-norm step halving, convergence checks, and weak-identification
   diagnostics.
-- Cache parameter-independent quantities and reuse common random probes.
+- Cache parameter-independent quantities, fixed spherical base vectors, and
+  valid CG initial guesses without allowing rejected trials to contaminate the
+  accepted cache.
 
-Gate: matrix-free `P_H` actions and AI matrices match the dense oracle; scores
-match within declared trace-estimation error; increasing the probe count
-reduces that error; seeded runs are reproducible; and accepted AI steps reduce
-the scaled score norm. Batched solves return the same columns as independent
-solves, while requiring one GRGL operator call per synchronized CG iteration.
+Gate: matrix-free `P_H` actions and AI matrices match the dense oracle; XTrace
+scores match within declared trace-estimation error; increasing the even query
+budget reduces error across seeded replicates; seeded runs are reproducible;
+and accepted AI steps reduce the scaled score norm. Cold and warm solves agree
+within `cg_tol`, rejected trials leave accepted cache state unchanged, and warm
+starts reduce total CG iterations on the benchmark. Batched solves return the
+same columns as independent solves, while requiring one GRGL operator call per
+synchronized CG iteration.
 
 ### Phase 4 - end-to-end evolutionary BOLT-LMM
 
@@ -617,10 +668,11 @@ association statistics are calibrated; full `r=1` reproduces simplified output.
 
 - Profile GRG traversal, projected CG, derivative matvec, trace-probe, and AI
   solve costs before optimizing.
-- Batch trace-probe and derivative right-hand sides, reuse score vectors, and
-  add CuPy parity only after CPU correctness.
-- Measure XTrace error per weighted-GRGL matvec equivalent; retain it only when
-  it improves the full fit, not merely a microbenchmark.
+- Batch XTrace range/correction and derivative right-hand sides, reuse warm
+  starts and score vectors, and add CuPy parity only after CPU correctness.
+- Measure XTrace error per weighted-GRGL matvec equivalent and choose its
+  default query budget only when it improves the full fit, not merely a
+  microbenchmark.
 
 Gate: memory remains `O(N * probes + M)` rather than `O(NM)`, CPU/GPU results
 agree within tolerance, and whole-genome LOCO does not rebuild dense matrices.
@@ -658,14 +710,22 @@ agree within tolerance, and whole-genome LOCO does not rebuild dense matrices.
   remainder is centered near zero.
 - Matrix-free and dense parameter estimates agree within declared Monte Carlo
   tolerance.
-- Fixed probes make repeated fits bitwise or tightly numerically reproducible.
-- Increasing trace probes reduces score error, and an accepted AI iteration
-  reduces the Fisher-scaled score norm.
+- Fixed spherical Gaussian base vectors make repeated fits bitwise or tightly
+  numerically reproducible, and every column has norm `sqrt(N)` within machine
+  precision.
+- Increasing the even XTrace operator-query budget reduces score RMSE across
+  seeded replicates, and an accepted AI iteration reduces the Fisher-scaled
+  score norm.
 - Profiled `sigma_b2` and derived `sigma_e2` match a joint dense REML fit.
 - Synchronized multi-RHS CG matches independent dense/CG solves for every
   column and uses one covariance matmat per iteration.
-- XTrace and Hutchinson both cover exact traces within their reported Monte
-  Carlo uncertainty.
+- Warm-started and zero-start CG solutions agree within tolerance; cache hits
+  reduce aggregate iterations; incompatible guesses fall back to zero; and
+  rejected step-halving trials cannot mutate the accepted cache.
+- TSLMM-style XTrace covers exact traces within its reported Monte Carlo
+  uncertainty, handles numerically deficient range sketches, and has lower
+  RMSE than spherical Hutchinson at a selected equal-cost budget on the
+  representative dense spectral fixtures.
 - Boundary/non-identification cases return diagnostics rather than unstable
   point estimates.
 - Reported `sigma_b2` is invariant to any internal numerical rescaling.

@@ -140,81 +140,155 @@ def _make_bolt_blocks(
     return tuple(bolt_blocks), bolt_frequencies
 
 
-def simulate_forward_data(seed: int = SEED) -> BenchmarkData:
-    """Run the same SLiM configuration as the forward-prior tutorial.
+def _build_benchmark_data(output_directory: Path, seed: int) -> BenchmarkData:
+    """Generate one benchmark data set into a persistent directory."""
 
-    The phenotype is generated once from the full GRG, then both methods fit
-    the same phenotype using two GRG blocks. The split is only an adapter for
-    GRAPP's LOCO calibration; it does not simulate a second data set.
-    """
+    output_directory = Path(output_directory).resolve()
+    output_directory.mkdir(parents=True, exist_ok=True)
+    tree_path = run_slim(output_directory, seed)
+    recorded = tskit.load(str(tree_path))
+    alpha = mutation_effects(recorded)
+    tree_sequence = recorded.simplify(filter_sites=False)
+    if alpha.size != tree_sequence.num_mutations:
+        raise ValueError(
+            "SLiM effect order changed during simplification: "
+            f"{alpha.size} effects for {tree_sequence.num_mutations} mutations"
+        )
+
+    full_path = output_directory / "slim_forward.simplified.trees"
+    tree_sequence.dump(str(full_path))
+    full_grg = pygrgl.grg_from_trees(str(full_path), compute_coals=True)
+    full_frequencies = sample_allele_frequencies(full_grg)
+    if alpha.size != full_grg.num_mutations:
+        raise ValueError(
+            "SLiM effect order does not match GRG mutation order: "
+            f"{alpha.size} effects for {full_grg.num_mutations} mutations"
+        )
+
+    prior = SimplifiedPrior(sigma_b2=SIGMA_A2, tau=TRUE_TAU)
+    full_ops = EvolutionaryLmmOps(
+        full_grg,
+        frequencies=full_frequencies,
+        model="simplified",
+    )
+    genetic_value = full_ops.apply_model_x(alpha)
+    rng = np.random.default_rng(seed + 1)
+    phenotype = genetic_value + rng.normal(
+        0.0,
+        np.sqrt(RESIDUAL_VARIANCE),
+        size=full_ops.n,
+    )
+
+    blocks = _split_forward_tree_sequence(tree_sequence, output_directory)
+    block_frequencies = {
+        label: sample_allele_frequencies(grg) for label, grg in blocks
+    }
+    bolt_blocks, bolt_block_frequencies = _make_bolt_blocks(
+        blocks,
+        block_frequencies,
+        output_directory,
+    )
+    concatenated_frequencies = np.concatenate(
+        [block_frequencies[label] for label, _ in blocks]
+    )
+    np.testing.assert_allclose(concatenated_frequencies, full_frequencies)
+    np.save(output_directory / "alpha.npy", alpha)
+    np.save(output_directory / "phenotype.npy", phenotype)
+    np.save(output_directory / "full.frequencies.npy", full_frequencies)
+    for label, frequencies in block_frequencies.items():
+        np.save(output_directory / f"{label}.frequencies.npy", frequencies)
+    for label, frequencies in bolt_block_frequencies.items():
+        np.save(output_directory / f"{label}.segregating.frequencies.npy", frequencies)
+    (output_directory / "seed.txt").write_text(f"{seed}\n", encoding="utf-8")
+
+    return BenchmarkData(
+        tree_sequence=tree_sequence,
+        full_grg=full_grg,
+        full_frequencies=full_frequencies,
+        alpha=alpha,
+        phenotype=phenotype,
+        blocks=blocks,
+        block_frequencies=block_frequencies,
+        bolt_blocks=bolt_blocks,
+        bolt_block_frequencies=bolt_block_frequencies,
+    )
+
+
+def prepare_benchmark_data(output_directory: Path, seed: int = SEED) -> BenchmarkData:
+    """Run SLiM once and persist all data required by subsequent fit runs."""
+
+    return _build_benchmark_data(Path(output_directory), seed)
+
+
+def load_benchmark_data(output_directory: Path) -> BenchmarkData:
+    """Load a previously prepared benchmark without rerunning SLiM."""
+
+    directory = Path(output_directory)
+    if not (directory / "slim_forward.simplified.trees").exists():
+        raise FileNotFoundError(
+            f"benchmark data are missing in {directory}; run prepare_bolt_benchmark.py first"
+        )
+    tree_sequence = tskit.load(str(directory / "slim_forward.simplified.trees"))
+    full_grg = pygrgl.grg_from_trees(
+        str(directory / "slim_forward.simplified.trees"), compute_coals=True
+    )
+    labels = ("block-1", "block-2")
+    blocks = tuple(
+        (
+            label,
+            pygrgl.grg_from_trees(
+                str(directory / f"slim_forward_{label.replace('-', '_')}.trees"),
+                compute_coals=True,
+            ),
+        )
+        for label in labels
+    )
+    bolt_blocks = tuple(
+        (
+            label,
+            pygrgl.load_immutable_grg(str(directory / f"{label}.segregating.grg")),
+        )
+        for label in labels
+    )
+    block_frequencies = {
+        label: np.load(directory / f"{label}.frequencies.npy") for label in labels
+    }
+    bolt_block_frequencies = {
+        label: np.load(directory / f"{label}.segregating.frequencies.npy")
+        for label in labels
+    }
+    return BenchmarkData(
+        tree_sequence=tree_sequence,
+        full_grg=full_grg,
+        full_frequencies=np.load(directory / "full.frequencies.npy"),
+        alpha=np.load(directory / "alpha.npy"),
+        phenotype=np.load(directory / "phenotype.npy"),
+        blocks=blocks,
+        block_frequencies=block_frequencies,
+        bolt_blocks=bolt_blocks,
+        bolt_block_frequencies=bolt_block_frequencies,
+    )
+
+
+def simulate_forward_data(seed: int = SEED) -> BenchmarkData:
+    """Run the simulation in a temporary directory for in-process callers."""
 
     with tempfile.TemporaryDirectory(prefix="evo_lmm_bolt_benchmark_") as directory:
-        output_directory = Path(directory)
-        tree_path = run_slim(output_directory, seed)
-        recorded = tskit.load(str(tree_path))
-        alpha = mutation_effects(recorded)
-        tree_sequence = recorded.simplify(filter_sites=False)
-        if alpha.size != tree_sequence.num_mutations:
-            raise ValueError(
-                "SLiM effect order changed during simplification: "
-                f"{alpha.size} effects for {tree_sequence.num_mutations} mutations"
-            )
-
-        full_path = output_directory / "slim_forward.simplified.trees"
-        tree_sequence.dump(str(full_path))
-        full_grg = pygrgl.grg_from_trees(str(full_path), compute_coals=True)
-        full_frequencies = sample_allele_frequencies(full_grg)
-        if alpha.size != full_grg.num_mutations:
-            raise ValueError(
-                "SLiM effect order does not match GRG mutation order: "
-                f"{alpha.size} effects for {full_grg.num_mutations} mutations"
-            )
-
-        prior = SimplifiedPrior(sigma_b2=SIGMA_A2, tau=TRUE_TAU)
-        full_ops = EvolutionaryLmmOps(
-            full_grg,
-            frequencies=full_frequencies,
-            model="simplified",
-        )
-        genetic_value = full_ops.apply_model_x(alpha)
-        rng = np.random.default_rng(seed + 1)
-        phenotype = genetic_value + rng.normal(
-            0.0,
-            np.sqrt(RESIDUAL_VARIANCE),
-            size=full_ops.n,
-        )
-
-        blocks = _split_forward_tree_sequence(tree_sequence, output_directory)
-        block_frequencies = {
-            label: sample_allele_frequencies(grg) for label, grg in blocks
-        }
-        bolt_blocks, bolt_block_frequencies = _make_bolt_blocks(
-            blocks,
-            block_frequencies,
-            output_directory,
-        )
-        concatenated_frequencies = np.concatenate(
-            [block_frequencies[label] for label, _ in blocks]
-        )
-        np.testing.assert_allclose(concatenated_frequencies, full_frequencies)
-
-        return BenchmarkData(
-            tree_sequence=tree_sequence,
-            full_grg=full_grg,
-            full_frequencies=full_frequencies,
-            alpha=alpha,
-            phenotype=phenotype,
-            blocks=blocks,
-            block_frequencies=block_frequencies,
-            bolt_blocks=bolt_blocks,
-            bolt_block_frequencies=bolt_block_frequencies,
-        )
+        return _build_benchmark_data(Path(directory), seed)
 
 
-def run_benchmark(seed: int = SEED) -> BenchmarkResult:
+def run_benchmark(
+    seed: int = SEED,
+    *,
+    data_directory: Path | None = None,
+) -> BenchmarkResult:
     """Fit evo-lmm and GRAPP BOLT-LMM and measure their wall-clock runtimes."""
 
-    data = simulate_forward_data(seed)
+    data = (
+        load_benchmark_data(data_directory)
+        if data_directory is not None
+        else simulate_forward_data(seed)
+    )
     initial = SimplifiedPrior(sigma_b2=SIGMA_A2, tau=TRUE_TAU)
 
     start = time.perf_counter()
@@ -234,6 +308,7 @@ def run_benchmark(seed: int = SEED) -> BenchmarkResult:
         max_iter=8,
         cg_tol=CG_TOL,
         seed=seed + 2,
+        trace_method="hutchinson",
     )
     evo_seconds = time.perf_counter() - start
 
@@ -401,7 +476,10 @@ def make_summary(result: BenchmarkResult) -> plt.Figure:
 
 
 if __name__ == "__main__":
-    benchmark = run_benchmark()
+    artifact_directory = Path("docs/_artifacts/bolt_seed_812")
+    benchmark = run_benchmark(
+        data_directory=artifact_directory if artifact_directory.exists() else None,
+    )
     print(
         f"mutations={benchmark.data.full_grg.num_mutations} "
         f"evo_lmm_seconds={benchmark.evo_seconds:.6f} "

@@ -20,7 +20,7 @@ Simulation and fitting code
    :language: python
    :linenos:
 
-The script uses a seeded Hutchinson trace estimator. The estimate of
+The script uses seeded Hutchinson trace estimates. The estimate of
 ``sigma_e2`` is usually tighter than the shape estimate ``tau`` because a
 single phenotype vector contains less information about the frequency shape.
 For that reason the panels use logarithmic y-axes and show all ten replicates,

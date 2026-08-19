@@ -5,6 +5,7 @@ __pycache__/
 # Build outputs at the repository root and in nested projects/docs folders.
 **/build/
 **/_build/
+docs/_artifacts/
 dist/
 wheels/
 *.egg-info

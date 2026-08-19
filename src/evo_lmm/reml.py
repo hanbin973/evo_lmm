@@ -11,7 +11,7 @@ from scipy.optimize import minimize
 from .operators import EvolutionaryLmmOps
 from .priors import EvolutionaryPrior, FullPrior, SimplifiedPrior, prior_from_coordinates
 from .results import FitDiagnostics, FitResult
-from .trace import TraceEstimate, hutchinson_trace, rademacher_probes
+from .trace import TraceEstimate, rademacher_probes, spherical_gaussian_probes, xtrace
 
 
 def _validate_y(y: np.ndarray, n: int) -> np.ndarray:
@@ -208,6 +208,12 @@ class _Quantities:
     ai: np.ndarray
     objective: float
     trace_errors: dict[str, float]
+    solve_cache: dict[str, np.ndarray]
+    cg_iterations: list[int]
+    warm_start_hits: int
+    warm_start_rejections: int
+    cg_initial_residuals: list[float]
+    cg_final_residuals: list[float]
 
 
 def _coordinate_names(model: str) -> list[str]:
@@ -237,6 +243,8 @@ def _quantities(
     exact: bool,
     cg_tol: float = 1e-9,
     exclude_chrom: Any = None,
+    initial_cache: Mapping[str, np.ndarray] | None = None,
+    trace_method: str = "hutchinson",
 ) -> _Quantities:
     prior, delta = prior_from_coordinates(ops.model_name, coordinates)
     names = _coordinate_names(ops.model_name)
@@ -261,13 +269,59 @@ def _quantities(
         score = exact_reml_score(y, h, derivative_matrices, basis, scale=sigma_b2)
         ai = profiled_average_information(y, h, derivative_matrices, basis, scale=sigma_b2)
         objective = float(0.5 * (logdet_h + logdet_fixed + ops.dim * np.log(max(q / ops.dim, 1e-300))))
-        return _Quantities(coordinates, prior, delta, sigma_b2, sigma_e2, q, ph_y, names, derivative_matrices, score, ai, objective, {name: 0.0 for name in names})
+        return _Quantities(
+            coordinates, prior, delta, sigma_b2, sigma_e2, q, ph_y, names,
+            derivative_matrices, score, ai, objective,
+            {name: 0.0 for name in names}, {}, [], 0, 0, [], [],
+        )
 
-    # Matrix-free projected inverse stage: phenotype plus all fixed probes.
-    rhs = np.column_stack((y, probes))
-    solved = ops.solve_ph(rhs, coordinates, exclude_chrom, tol=cg_tol)
-    ph_y = solved[:, 0]
-    ph_probes = solved[:, 1:]
+    cache_in = {} if initial_cache is None else dict(initial_cache)
+    cache_out: dict[str, np.ndarray] = {}
+    cg_iterations: list[int] = []
+    warm_start_hits = 0
+    warm_start_rejections = 0
+    cg_initial_residuals: list[float] = []
+    cg_final_residuals: list[float] = []
+
+    def solve(rhs: np.ndarray, key: str) -> np.ndarray:
+        nonlocal warm_start_hits, warm_start_rejections
+        stats: dict[str, Any] = {}
+        initial = cache_in.get(key)
+        result = ops.solve_ph(
+            rhs,
+            coordinates,
+            exclude_chrom,
+            tol=cg_tol,
+            initial=initial,
+            stats=stats,
+        )
+        result_matrix = np.asarray(result, dtype=np.float64)
+        if result_matrix.ndim == 1:
+            result_matrix = result_matrix[:, None]
+        cache_out[key] = result_matrix.copy()
+        cg_iterations.append(int(stats.get("iterations", 0)))
+        warm_start_hits += int(stats.get("warm_used", 0))
+        warm_start_rejections += int(stats.get("warm_rejected", 0))
+        cg_initial_residuals.append(float(stats.get("initial_residual_norm", 0.0)))
+        cg_final_residuals.append(float(stats.get("final_residual_norm", 0.0)))
+        return result_matrix
+
+    if trace_method not in ("xtrace", "hutchinson"):
+        raise ValueError("trace_method must be 'xtrace' or 'hutchinson'")
+
+    # Matrix-free projected inverse stage. Hutchinson retains the historical
+    # shared multi-RHS solve; XTrace solves only the phenotype here because its
+    # derivative-specific query systems are constructed below.
+    if trace_method == "hutchinson":
+        solved = solve(
+            np.column_stack((np.asarray(y, dtype=np.float64), probes)),
+            "phenotype+trace",
+        )
+        ph_y = solved[:, 0]
+        hutch_solved = solved[:, 1:]
+    else:
+        ph_y = solve(np.asarray(y, dtype=np.float64)[:, None], "phenotype")[:, 0]
+        hutch_solved = None
     q = float(y @ ph_y)
     sigma_b2 = q / max(ops.dim, 1)
     sigma_e2 = delta * sigma_b2
@@ -277,14 +331,33 @@ def _quantities(
     for index, name in enumerate(names):
         derivative_vectors.append(ops.apply_dh(ph_y, coordinates, name, exclude_chrom))
         data_quad = float(ph_y @ derivative_vectors[-1])
-        applied = ops.apply_dh_matmat(probes, coordinates, name, exclude_chrom)
-        trace_samples = np.sum(ph_probes * applied, axis=0)
-        trace = float(np.mean(trace_samples))
-        trace_errors[name] = float(np.std(trace_samples, ddof=1) / np.sqrt(trace_samples.size)) if trace_samples.size > 1 else 0.0
-        score[index] = 0.5 * (data_quad / max(sigma_b2, np.finfo(float).tiny) - trace)
-    # Use the common derivative RHS stage, sharing all inverse applications.
+
+        if trace_method == "hutchinson":
+            applied = ops.apply_dh_matmat(probes, coordinates, name, exclude_chrom)
+            samples = np.sum(hutch_solved * applied, axis=0)
+            estimate = TraceEstimate(
+                float(np.mean(samples)),
+                float(np.std(samples, ddof=1) / np.sqrt(samples.size)) if samples.size > 1 else 0.0,
+                "hutchinson",
+                int(samples.size),
+            )
+        else:
+            query = 0
+
+            def trace_apply(values: np.ndarray) -> np.ndarray:
+                nonlocal query
+                rhs = ops.apply_dh_matmat(values, coordinates, name, exclude_chrom)
+                key = f"trace:{name}:omega" if query == 0 else f"trace:{name}:q"
+                query += 1
+                return solve(rhs, key)
+
+            estimate = xtrace(trace_apply, probes)
+        trace_errors[name] = float(estimate.standard_error)
+        score[index] = 0.5 * (data_quad / max(sigma_b2, np.finfo(float).tiny) - estimate.value)
+
+    # Use the derivative RHS stage for the average-information matrix.
     eta = np.column_stack(derivative_vectors) if derivative_vectors else np.empty((ops.n, 0))
-    zeta = ops.solve_ph(eta, coordinates, exclude_chrom, tol=cg_tol) if eta.shape[1] else eta
+    zeta = solve(eta, "derivative") if eta.shape[1] else eta
     ai = np.empty((len(names), len(names)), dtype=np.float64)
     for i in range(len(names)):
         for j in range(len(names)):
@@ -293,7 +366,12 @@ def _quantities(
     data_quadratics = np.asarray([float(ph_y @ value) for value in derivative_vectors], dtype=np.float64)
     if q > 0.0:
         ai -= np.outer(data_quadratics, data_quadratics) / (2.0 * max(sigma_b2 * q, np.finfo(float).tiny))
-    return _Quantities(coordinates, prior, delta, sigma_b2, sigma_e2, q, ph_y, names, derivative_vectors, score, ai, float("nan"), trace_errors)
+    return _Quantities(
+        coordinates, prior, delta, sigma_b2, sigma_e2, q, ph_y, names,
+        derivative_vectors, score, ai, float("nan"), trace_errors,
+        cache_out, cg_iterations, warm_start_hits, warm_start_rejections,
+        cg_initial_residuals, cg_final_residuals,
+    )
 
 
 def _dense_derivative_kernel(
@@ -323,12 +401,15 @@ def fit_reml(
     cg_tol: float = 1e-9,
     max_step: float = 2.0,
     exact: bool | None = None,
+    trace_method: str = "hutchinson",
+    warm_start: bool = True,
 ) -> FitResult:
     """Fit evolutionary shape parameters by profiled average-information REML.
 
     ``sigma_b2`` is profiled as ``y'P_H y / (N-rank(C))`` and ``sigma_e2`` is
-    derived as ``delta*sigma_b2``.  Dense operators use exact traces by default;
-    GRG operators use fixed common Hutchinson probes.
+    derived as ``delta*sigma_b2``. Dense operators use exact traces by default;
+    matrix-free operators use fixed spherical XTrace vectors and warm-started
+    projected CG solves.
     """
 
     if model is not None and model != ops.model_name:
@@ -353,8 +434,14 @@ def fit_reml(
     coords[1] = max(coords[1], np.log(np.finfo(np.float64).tiny))
     if model_name == "full":
         coords[2] = float(np.clip(coords[2], -20.0, 20.0))
-    probe_count = max(int(trace_probes), 1)
-    probes = rademacher_probes(ops.n, probe_count, seed)
+    if trace_method not in ("xtrace", "hutchinson"):
+        raise ValueError("trace_method must be 'xtrace' or 'hutchinson'")
+    probe_count = max(int(trace_probes), 2)
+    probes = (
+        spherical_gaussian_probes(ops.n, probe_count, seed)
+        if trace_method == "xtrace"
+        else rademacher_probes(ops.n, probe_count, seed)
+    )
     is_dense = all(chrom.dense is not None for chrom in ops._chromosomes)
     use_exact = is_dense if exact is None else bool(exact)
     diagnostics_warnings: set[str] = set()
@@ -364,10 +451,15 @@ def fit_reml(
     ai_condition = np.inf
     damping = 0.0
     accepted_iterations = 0
+    accepted_cache: dict[str, np.ndarray] = {}
 
     for iteration in range(1, int(max_iter) + 1):
         try:
-            current = _quantities(ops, y_arr, coords, probes, exact=use_exact, cg_tol=cg_tol)
+            current = _quantities(
+                ops, y_arr, coords, probes, exact=use_exact, cg_tol=cg_tol,
+                initial_cache=accepted_cache if warm_start else {},
+                trace_method=trace_method,
+            )
         except (np.linalg.LinAlgError, ValueError):
             damping = max(1e-6, damping * 10.0 if damping else 1e-6)
             coords[0] += 1.0
@@ -397,16 +489,23 @@ def fit_reml(
             step *= max_step / step_norm
         old_norm = float(np.linalg.norm(active_score / np.sqrt(np.maximum(np.diag(trial_ai), 1e-12))))
         accepted = False
+        trial_cache = current.solve_cache if warm_start else {}
         for halving in range(12):
             trial_coords = coords.copy()
             trial_coords[active_coordinates] += step * (0.5**halving)
             try:
-                trial = _quantities(ops, y_arr, trial_coords, probes, exact=use_exact, cg_tol=cg_tol)
+                trial = _quantities(
+                    ops, y_arr, trial_coords, probes, exact=use_exact,
+                    cg_tol=cg_tol, initial_cache=trial_cache,
+                    trace_method=trace_method,
+                )
+                trial_cache = trial.solve_cache
                 trial_ai_active = trial.ai[np.ix_(active_coordinates, active_coordinates)]
                 new_norm = float(np.linalg.norm(trial.score[active_coordinates] / np.sqrt(np.maximum(np.diag(trial_ai_active + damping * np.eye(trial_ai_active.shape[0])), 1e-12))))
                 objective_ok = not use_exact or trial.objective <= current.objective + 1e-10
                 if objective_ok and (new_norm <= old_norm or np.max(np.abs(step)) * (0.5**halving) <= tol):
                     coords = trial_coords
+                    accepted_cache = trial.solve_cache
                     last_step = float(np.max(np.abs(step)) * (0.5**halving))
                     accepted = True
                     accepted_iterations = iteration
@@ -477,9 +576,17 @@ def fit_reml(
         ai_condition=float(ai_condition),
         ai_damping=float(damping),
         accepted_step=float(last_step),
-        trace_estimator="exact" if use_exact else "hutchinson",
+        trace_estimator="exact" if use_exact else trace_method,
         trace_probes=0 if use_exact else probe_count,
+        trace_operator_queries=(
+            0 if use_exact else (2 * probe_count if trace_method == "xtrace" else probe_count)
+        ),
         trace_standard_errors=dict(last_q.trace_errors),
+        cg_iterations=list(last_q.cg_iterations),
+        cg_warm_start_hits=int(last_q.warm_start_hits),
+        cg_warm_start_rejections=int(last_q.warm_start_rejections),
+        cg_initial_residual_norms=list(last_q.cg_initial_residuals),
+        cg_final_residual_norms=list(last_q.cg_final_residuals),
         random_seed=int(seed),
         boundary_hits=tuple(sorted(warnings)),
         warnings=tuple(sorted(warnings)),
@@ -543,8 +650,8 @@ def haseman_elston_initialization(
     """Estimate ``(sigma_b2, sigma_e2, delta)`` by projected HE moments.
 
     The moment solution is intentionally only an initializer.  Exact dense
-    traces are used for dense operators; fixed-probe Hutchinson estimates are
-    used for GRG operators.
+    traces are used for dense operators; spherical XTrace estimates are used
+    for GRG operators.
     """
 
     y_arr = _validate_y(y, ops.n)
@@ -556,11 +663,14 @@ def haseman_elston_initialization(
         pkp = projector @ kernel @ projector
         a = float(np.trace(pkp @ pkp))
     else:
-        probe_values = rademacher_probes(ops.n, max(int(probes), 1), seed)
-        projected_k_probes = np.column_stack(
-            [ops.project(k_apply(probe_values[:, i])) for i in range(probe_values.shape[1])]
-        )
-        a = float(np.mean(np.sum(projected_k_probes * projected_k_probes, axis=0)))
+        probe_values = spherical_gaussian_probes(ops.n, max(int(probes), 2), seed)
+
+        def squared_kernel_apply(values: np.ndarray) -> np.ndarray:
+            return np.column_stack(
+                [ops.project(k_apply(ops.project(values[:, i]))) for i in range(values.shape[1])]
+            )
+
+        a = float(xtrace(squared_kernel_apply, probe_values).value)
     b = float(ops.kernel_trace(prior))
     d = float(max(ops.dim, 1))
     rhs = np.array([projected @ k_apply(projected), projected @ projected], dtype=np.float64)

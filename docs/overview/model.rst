@@ -42,5 +42,6 @@ The parameter constraints are ``sigma_b2 > 0``, ``tau >= 0``, and
 ``rho_ab^2 = 1`` boundary of the full model, not a free reparameterization.
 
 Variance components are estimated by profiled AI-REML. Dense inputs provide
-an exact reference path; GRG inputs use matrix-free projected solves and
-Hutchinson trace estimates with fixed seeded probes.
+an exact reference path; GRG inputs use matrix-free projected solves,
+warm-started conjugate-gradient solves, and fixed seeded Hutchinson trace
+estimates. XTrace remains available as an explicit alternative.

@@ -23,8 +23,13 @@ class FitDiagnostics:
     accepted_step: float
     trace_estimator: str
     trace_probes: int
+    trace_operator_queries: int = 0
     trace_standard_errors: dict[str, float] = field(default_factory=dict)
     cg_iterations: list[int] = field(default_factory=list)
+    cg_warm_start_hits: int = 0
+    cg_warm_start_rejections: int = 0
+    cg_initial_residual_norms: list[float] = field(default_factory=list)
+    cg_final_residual_norms: list[float] = field(default_factory=list)
     random_seed: int | None = None
     boundary_hits: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()

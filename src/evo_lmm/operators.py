@@ -602,8 +602,15 @@ class EvolutionaryLmmOps:
         tol: float = 1e-9,
         max_iter: int | None = None,
         initial: np.ndarray | None = None,
+        stats: dict[str, Any] | None = None,
     ) -> np.ndarray:
-        """Solve projected ``H z = P_C rhs`` for one or many right-hand sides."""
+        """Solve projected ``H z = P_C rhs`` for one or many right-hand sides.
+
+        ``initial`` is an optional warm start. Each column is validated against
+        a zero start independently; a poor or invalid cached column is reset
+        without affecting the other right-hand sides. If ``stats`` is passed,
+        it is populated with aggregate iteration and warm-start diagnostics.
+        """
 
         rhs = np.asarray(rhs_columns, dtype=np.float64)
         was_vector = rhs.ndim == 1
@@ -612,19 +619,45 @@ class EvolutionaryLmmOps:
         if rhs.ndim != 2 or rhs.shape[0] != self.n:
             raise ValueError("rhs_columns must have shape (n, k)")
         b = self.project(rhs)
-        x = np.zeros_like(b) if initial is None else np.asarray(initial, dtype=np.float64).copy()
-        if x.shape != b.shape:
-            raise ValueError("initial has a different shape from rhs_columns")
-        x = self.project(x)
+        warm_requested = initial is not None
+        x = np.zeros_like(b)
+        warm_used = np.zeros(b.shape[1], dtype=bool)
+        warm_rejected = np.zeros(b.shape[1], dtype=bool)
+        if initial is not None:
+            candidate = np.asarray(initial, dtype=np.float64)
+            if candidate.shape != b.shape:
+                warm_rejected[:] = True
+                candidate = None
+            if candidate is None:
+                initial = None
+            else:
+                finite = np.all(np.isfinite(candidate), axis=0)
+                if np.any(finite):
+                    projected_candidate = self.project(candidate[:, finite])
+                    x[:, finite] = projected_candidate
+                    warm_used[finite] = True
+                warm_rejected[~finite] = True
         residual = b - self._apply_h_matmat(x, phi, exclude_chrom)
         residual = self.project(residual)
+        if initial is not None and np.any(warm_used):
+            zero_residual_norm2 = np.sum(b * b, axis=0)
+            candidate_residual_norm2 = np.sum(residual * residual, axis=0)
+            worse = warm_used & (candidate_residual_norm2 > zero_residual_norm2)
+            if np.any(worse):
+                x[:, worse] = 0.0
+                warm_used[worse] = False
+                warm_rejected[worse] = True
+                residual[:, worse] = b[:, worse]
+        initial_residual_norm = float(np.sqrt(np.max(np.sum(residual * residual, axis=0)))) if residual.size else 0.0
         directions = residual.copy()
         residual_norm2 = np.sum(residual * residual, axis=0)
         target = np.maximum(residual_norm2, 1.0) * float(tol) ** 2
         active = residual_norm2 > target
         if max_iter is None:
             max_iter = max(50, 4 * self.n)
+        iterations = 0
         for _ in range(int(max_iter)):
+            iterations += 1
             if not np.any(active):
                 break
             active_indices = np.flatnonzero(active)
@@ -647,6 +680,14 @@ class EvolutionaryLmmOps:
         if np.any(active):
             max_rel = float(np.sqrt(np.max(residual_norm2[active]) / np.maximum(np.max(np.sum(b * b, axis=0)), 1e-300)))
             raise np.linalg.LinAlgError(f"projected CG did not converge; relative residual {max_rel:.3g}")
+        if stats is not None:
+            stats["iterations"] = int(iterations)
+            stats["active_columns"] = int(rhs.shape[1])
+            stats["warm_requested"] = bool(warm_requested)
+            stats["warm_used"] = int(np.count_nonzero(warm_used))
+            stats["warm_rejected"] = int(np.count_nonzero(warm_rejected))
+            stats["initial_residual_norm"] = initial_residual_norm
+            stats["final_residual_norm"] = float(np.sqrt(np.max(residual_norm2))) if residual_norm2.size else 0.0
         return x[:, 0] if was_vector else x
 
     def _apply_h_matmat(self, values: np.ndarray, phi: Any, exclude_chrom: Any) -> np.ndarray:

@@ -51,7 +51,10 @@ def generate() -> None:
 
     import bolt_benchmark
 
-    benchmark = bolt_benchmark.run_benchmark()
+    benchmark_artifacts = DOCS_DIRECTORY / "_artifacts" / "bolt_seed_812"
+    benchmark = bolt_benchmark.run_benchmark(
+        data_directory=benchmark_artifacts if benchmark_artifacts.exists() else None,
+    )
     benchmark_figure = bolt_benchmark.make_summary(benchmark)
     benchmark_figure.savefig(
         OUTPUT_DIRECTORY / "bolt_benchmark.png",
