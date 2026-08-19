@@ -150,9 +150,5 @@ The current ten-replicate fit run reports:
      - 11.74
      - 1.77
 
-The figure is pre-generated so documentation builds do not rerun SLiM, GRG
-conversion, or either model. Regenerate it with
-``uv run python docs/generate_figures.py``.
-
 .. image:: ../_static/generated/bolt_benchmark.png
    :alt: Cumulative genic variance benchmark for evo-lmm and GRAPP BOLT-LMM

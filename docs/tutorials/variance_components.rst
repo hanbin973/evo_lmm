@@ -33,8 +33,7 @@ including fits that land near the ``tau=0`` boundary.
 Replicate estimates
 -------------------
 
-The result below is a pre-generated local asset. The source remains available
-above, but ReadTheDocs does not need to rerun the ten-replicate fit.
+The figure summarizes the ten replicate fits.
 
 .. image:: ../_static/generated/variance_components.png
    :alt: Box plots of evolutionary variance component estimates across ten replicates
