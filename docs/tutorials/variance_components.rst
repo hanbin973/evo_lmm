@@ -16,9 +16,12 @@ the simulation boundary easy to inspect.
 Simulation and fitting code
 ---------------------------
 
-.. literalinclude:: variance_components.py
-   :language: python
-   :linenos:
+.. dropdown:: Show the simulation and fitting code
+   :color: light
+
+   .. literalinclude:: variance_components.py
+      :language: python
+      :linenos:
 
 The script uses seeded Hutchinson trace estimates. The estimate of
 ``sigma_e2`` is usually tighter than the shape estimate ``tau`` because a

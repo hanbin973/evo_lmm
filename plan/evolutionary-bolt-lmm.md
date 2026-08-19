@@ -176,6 +176,24 @@ That setup is useful for timing but is not a production convergence policy.
 
 - [ ] Define and test a production convergence policy independently of the
   matched-budget benchmark.
+- [ ] Split stochastic REML into two trace-precision stages:
+  - a **sketch stage** uses a small configurable probe budget for the first
+    coarse AI-REML steps, where accurate scores are unnecessary;
+  - a **refinement stage** switches to a larger configurable probe budget
+    before convergence can be declared and uses that budget for final scores,
+    uncertainty diagnostics, and reported estimates;
+  - make the refinement probes a deterministic superset of the sketch probes
+    so the switch adds information without discarding the common random
+    numbers already used by the optimizer;
+  - define the transition using optimization state (for example, a bounded
+    step/score threshold) with a maximum sketch-iteration fallback, rather
+    than relying only on a fixed iteration number;
+  - reset or revalidate CG warm-start caches at the transition and record the
+    stage, probe counts, transition iteration, and operator-query counts in
+    diagnostics;
+  - test that final convergence and estimates are judged only at refinement
+    precision, including cases where the sketch-stage score appears to have
+    converged by chance.
 - [x] Wire `haseman_elston_initialization()` into `fit_reml()` as the optional
   `initialization="he"` mode. The default remains unchanged.
 - [ ] Add a matrix-free full-model GRG recovery test away from the `rho`
@@ -226,8 +244,10 @@ and operator-equivalent work over multiple persisted replicates.
 
 - XTrace is not the default: current equal-cost experiments do not show a
   consistent error advantage over Hutchinson.
-- Five trace probes are not the default: the measured speedup came with large
-  shifts in shape estimates and larger trace uncertainty.
+- Five trace probes are not sufficient for final refinement by default: the
+  measured speedup came with large shifts in shape estimates and larger trace
+  uncertainty. A similarly small budget may be evaluated for the sketch stage
+  because its estimates are not reportable final results.
 - Nyström preconditioning is deferred until profiling demonstrates that solve
   iterations dominate total runtime.
 - GPU work is deferred until CPU statistical calibration is complete.

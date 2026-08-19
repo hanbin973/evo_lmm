@@ -1,10 +1,13 @@
 Benchmark against GRAPP BOLT-LMM
 ================================
 
-This page compares the GRG-backed evolutionary fit with GRAPP's
-``bolt_lmm_inf`` implementation on the same explicit forward-simulation data.
-It reuses the simulation source and configured parameters from
-:doc:`slim_forward_simplified`:
+This tutorial compares the GRG-backed evolutionary model with GRAPP's
+``bolt_lmm_inf`` on the forward-simulated populations from
+:doc:`slim_forward_simplified`. It asks whether the evolutionary model
+reproduces the distribution of genic variance across allele frequencies, and
+how much fitting time it requires on the same GRG-backed data.
+
+The shared simulation uses:
 
 * 2,000 diploid individuals and a ``4N = 8,000`` generation burn-in;
 * ``L = 10^6`` bases and ``V_S = 2N = 4,000``, hence
@@ -12,37 +15,26 @@ It reuses the simulation source and configured parameters from
 * ``sigma_a^2 = sigma_b^2 = 1`` and the simplified ``rho^2 = 1`` model; and
 * residual variance ``sigma_e^2 = 0.4``.
 
-The benchmark reuses the ten deterministic forward replicates (seeds
-``812``--``821``) generated for :doc:`slim_forward_simplified`. Each replicate
-has its own phenotype and full GRG. For the fits, each tree sequence is divided
-into two physical blocks.
-This is an implementation detail required by GRAPP's leave-one-chromosome-out
-calibration: with only one block, there is no chromosome left out of the
-calibration set. Both blocks retain all 2,000 individuals and their GRGs are
-created with coalescent counts enabled for GRAPP's ``XTX`` traversal.
+The ten deterministic replicates (seeds ``812``--``821``) are shared between
+the two tutorials. Each has its own phenotype and full GRG. For fitting, the
+tree sequence is split into two blocks so that GRAPP's leave-one-chromosome-out
+calibration has a block to leave out. Both blocks retain all 2,000 individuals
+and include coalescent counts for GRAPP's ``XTX`` traversal.
 
-The reported timings cover the fitting calls only and are aggregated across the
-ten replicates. They include each method's
-operator setup, variance-component estimation, and method-specific calibration
-or trace work, but exclude the shared SLiM simulation, tskit simplification,
-and GRG conversion. The exact seconds are machine-dependent and are printed
-when the example is run directly. The checked-in figure was generated locally
-so hosted documentation builds do not rerun this compute-heavy benchmark.
-Both fits use 15 stochastic trials/probes and a ``5e-4`` CG tolerance, matching
-GRAPP's defaults for 2,000 individuals. Both implementations batch probe
-columns into GRG ``matmat`` traversals. These controls matter: the earlier
-benchmark requested 64 probes and a ``1e-8`` tolerance only from evo-lmm, which
-made the wall-clock comparison measure a substantially larger numerical-work
-budget.
+Timings cover fitting only: operator setup, variance-component estimation, and
+each method's calibration or trace work. They exclude the shared SLiM run,
+tskit simplification, and GRG conversion. Both methods use 15 stochastic
+trials/probes and a ``5e-4`` CG tolerance. Times will vary by machine; the
+example prints the values observed locally.
 
 Sequential REML profiling
 -------------------------
 
-The following measurements use one shared seed-812 simulation, ``max_iter=8``,
-and ``cg_tol=5e-4``. Only the REML fit is timed; the reported fits had not yet
-converged at the iteration cap, so the estimates are useful for profiling and
-probe-sensitivity rather than final inference. Re-run the exact sweep with
-``uv run python docs/tutorials/trace_profile.py``.
+This profiling experiment uses the seed-812 replicate, ``max_iter=8``, and
+``cg_tol=5e-4``. It isolates the REML loop to show the effect of warm starts,
+the trace estimator, and probe count. The iteration cap is deliberately short,
+so these estimates are for profiling rather than inference. Reproduce the
+sweep with ``uv run python docs/tutorials/trace_profile.py``.
 
 .. list-table::
    :header-rows: 1
@@ -88,25 +80,13 @@ probe-sensitivity rather than final inference. Re-run the exact sweep with
      - 0.391342
      - 6
 
-Warm starts reduce the cold-Hutchinson fit by 2.30x and reduce aggregate CG
-iterations from 1,696 to 2. XTrace with 15 vectors costs 1.79x the warm-
-Hutchinson fit because each derivative trace has two operator-query blocks;
-reducing XTrace to five vectors cuts that overhead to 1.34x (34.280 s).
-Relative to 15 vectors, five vectors shift the fitted ``sigma_b2`` by +4.15%,
-``tau`` by +64.54%, ``sigma_e2`` by -1.95%, and ``delta`` by -5.86%. The
-reported XTrace standard errors for ``(log_delta, log_tau)`` increase from
-``(6.221, 2.247)`` to ``(11.750, 7.101)`` (+88.88% and +216.04%), quantifying
-the precision cost of the speedup.
-
-This is not yet evidence that XTrace uniformly improves trace accuracy. In
-the same fit, XTrace-15 has a larger ``log_delta`` standard error (6.221 versus
-5.109 for Hutchinson-15) but a smaller ``log_tau`` standard error (2.247 versus
-3.319). In a separate seeded dense fixture, matched at 10 operator queries,
-XTrace-5 versus Hutchinson-10 had RMSE ratios of 1.38 (``log_delta``) and 1.24
-(``log_tau``); matched at 30 queries, XTrace-15 versus Hutchinson-30 had ratios
-of 1.49 and 1.36. XTrace remains useful as the implemented variance-reduced
-alternative, but its default query budget should be selected from these
-end-to-end error measurements rather than assumed to dominate Hutchinson.
+Warm starts reduce this short fit from 58.833 to 25.598 seconds and reduce the
+aggregate CG count from 1,696 to 2. XTrace uses two query blocks per derivative
+trace, so its 15-vector configuration takes 45.840 seconds. Reducing XTrace to
+five vectors lowers that to 34.280 seconds, but substantially changes the
+estimated ``tau`` and increases trace uncertainty. These results motivate the
+Hutchinson default: in this setting, XTrace does not show a consistent error
+advantage at matched query budgets.
 
 Cumulative genic variance
 -------------------------
@@ -125,31 +105,33 @@ markers (``sigma_g2/M`` per marker). In raw-dosage effect notation this is
 therefore a neutral frequency-independent reference. evo-lmm instead uses the
 frequency-dependent simplified prior
 ``sigma_b^2/(1 + 2*tau*x*(1-x))``.
-Each plotted point is the mean across the ten forward replicates, with an error
-bar showing the sample standard deviation. The runtime annotation uses the
-same mean-plus-standard-deviation convention.
+Each point is the mean across the ten forward replicates, and error bars show
+the sample standard deviation. The runtime annotation uses the same summary.
 
-.. literalinclude:: bolt_benchmark.py
-   :language: python
-   :linenos:
+.. dropdown:: Show the benchmark implementation
+   :color: light
 
-Prepare the ten forward simulation and GRG artifacts once from the repository root with:
+   .. literalinclude:: bolt_benchmark.py
+      :language: python
+      :linenos:
+
+Prepare the ten forward-simulation and GRG artifacts once from the repository
+root:
 
 .. code-block:: console
 
    uv run python docs/tutorials/prepare_bolt_benchmark.py
 
-Then rerun only the ten-replicate LMM fitting comparison as often as needed with:
+Then rerun the ten-replicate fitting comparison without repeating SLiM:
 
 .. code-block:: console
 
    uv run python docs/tutorials/fit_bolt_benchmark.py
 
-The prepared files are stored under ``docs/_artifacts/`` (ignored by Git).
-Running ``bolt_benchmark.py`` or the figure generator automatically reuses the
-ten forward directories when they exist; it does not rerun SLiM. The fit-only
-script prints per-replicate estimates and the mean and sample standard
-deviation of both runtimes.
+The prepared files live under ``docs/_artifacts/`` and are ignored by Git.
+``bolt_benchmark.py`` and the figure generator reuse them when present. The
+fit-only script reports each replicate together with the mean and sample
+standard deviation of both runtimes.
 
 The current ten-replicate fit run reports:
 
@@ -166,8 +148,8 @@ The current ten-replicate fit run reports:
      - 11.74
      - 1.77
 
-The figure is pre-generated locally so ReadTheDocs does not rerun SLiM, GRG
-conversion, or either fitted model. Regenerate it with
+The figure is pre-generated so documentation builds do not rerun SLiM, GRG
+conversion, or either model. Regenerate it with
 ``uv run python docs/generate_figures.py``.
 
 .. image:: ../_static/generated/bolt_benchmark.png

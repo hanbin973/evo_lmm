@@ -1,33 +1,33 @@
 Explicit forward simulation with SLiM
 =====================================
 
-This page checks the simplified evolutionary prior on ten independently seeded
-tree sequences produced by explicit forward simulations. It follows the tutorial style of the
-`PySLiM spatial vignette <https://tskit.dev/pyslim/docs/stable/vignette_space.html>`_:
-the workflow is presented as a sequence of simulation, inspection, conversion,
-and analysis steps. PySLiM is not used here. The tree sequence is produced by
-the ``slim`` executable, and the only Python-side tree-sequence operations are
-provided by ``tskit`` and ``pygrgl``.
+This tutorial uses SLiM to generate ten independent populations under the
+simplified evolutionary model, then fits evo-lmm to the sampled genotypes and
+phenotypes. Its purpose is to check the model in the setting from which its
+frequency-dependent prior is derived: mutation, drift, recombination, and
+stabilizing selection jointly determine which variants are segregating and
+their effects.
+
+It is tempting to draw variant effects from the final conditional prior,
+simulate ``y = G beta + e``, and fit the same model back to those data. That is
+a useful numerical check of the fitting code, but it is not a check of the
+evolutionary argument. In the model specification, the key step is the
+effect-dependent site-frequency spectrum ``p(G_j | alpha_j)``: stabilizing
+selection changes the chance that a mutation with a given latent effect is
+observed at a particular frequency. Conditioning that population process on
+the sampled genotype is what yields ``E[beta_j^2 | G_j]``. A direct regression
+simulation assumes this relationship rather than generating it, and omits the
+finite-population and linkage effects that accompany it. Forward simulation
+therefore provides the appropriate end-to-end experiment.
 
 The SLiM model is adapted from the paper repository's
 `burn-in script <https://github.com/hanbin973/param_arch_stab_paper/blob/main/codes/scripts/burnin.slim>`_
 and `replicate script <https://github.com/hanbin973/param_arch_stab_paper/blob/main/codes/scripts/main.slim>`_.
-In particular:
-
-* mutation type ``m2`` carries normally distributed selection coefficients;
-* ``mutationEffect(m2)`` returns one, so the coefficients are treated as trait
-  effects rather than direct mutation fitness effects;
-* stabilizing fitness is ``exp(-phenotype^2 / (2 * V_S))``;
-* ``V_S`` is the fitness width and ``W_S = V_S / (2N)`` is its
-  dimensionless diffusion-time rescaling;
-* the simplified model uses the paper's ``rho^2 = 1`` construction, so
-  ``beta_j = alpha_j``.
-
-SLiM stores the m2 coefficients in each mutation's tree-sequence metadata.
-The Python driver reads those coefficients from the tskit mutation table in
-the same order as the mutations passed to GRGL. This keeps the effect vector
-explicit and aligned after GRG conversion. It does not annotate the tree
-sequence with PySLiM metadata.
+Mutations have normally distributed latent effects, fitness is
+``exp(-phenotype^2 / (2 * V_S))``, and ``W_S = V_S / (2N)`` is the
+dimensionless selection-width parameter. This tutorial uses the simplified
+``rho^2 = 1`` case, for which the focal and selected effects agree:
+``beta_j = alpha_j``.
 
 Prerequisites
 -------------
@@ -45,39 +45,39 @@ complete SLiM source is included as :download:`slim_simplified_prior.slim`.
 The forward model
 -----------------
 
-The SLiM source is deliberately short enough to read alongside the Python
-driver:
+The simulation fixes a diploid population of 2,000 individuals, runs for
+``4N = 8,000`` generations across ``L = 10^6`` bases, and records a tree
+sequence. It uses ``V_S = 2N = 4,000``, hence ``W_S = 1``. The complete SLiM
+source is available below.
 
-.. literalinclude:: slim_simplified_prior.slim
-   :language: slim
-   :linenos:
+.. dropdown:: Show the SLiM model
+   :color: light
 
-It simulates 2,000 diploid individuals for ``4N = 8,000`` generations across
-``L = 10^6`` bases, records the tree sequence, and stores the m2 selection
-coefficients in its mutation metadata. Here ``V_S = 2N = 4,000`` and
-therefore ``W_S = 1``.
-The production paper
-scripts separate burn-in and replicate runs; this documentation version
-combines the essential steps so that one command produces the data consumed
-by the GRG-backed fit. The checked-in figure was generated locally so hosted
-documentation builds do not rerun this compute-heavy workflow.
+   .. literalinclude:: slim_simplified_prior.slim
+      :language: slim
+      :linenos:
+
+SLiM records the mutation effects in tree-sequence metadata. The production
+scripts separate burn-in and replicate runs; this compact version combines the
+essential steps for a reproducible example. The checked-in figure is generated
+locally, so documentation builds do not rerun the simulation.
 
 SLiM to GRG to evo-lmm
 ----------------------
 
-For each replicate, the Python driver runs SLiM, loads the resulting tree
-sequence to report its size, simplifies the current leaf samples with ordinary
-``tskit`` operations, converts that tree sequence with
-``pygrgl.grg_from_trees``, computes sample allele frequencies, and applies the
-raw GRG dosage operator to the metadata-derived ``alpha`` effects. It then adds
-environmental residual noise and fits the simplified prior with the
-BOLT-style matrix-free path. The simplification is needed because the full
-SLiM recording also marks historical nodes as samples; it is not a PySLiM
-operation.
+For each replicate, the driver simplifies the extant samples with ``tskit``,
+converts the tree sequence with ``pygrgl.grg_from_trees``, computes sample
+allele frequencies, and uses the raw GRG dosage operator to form genetic
+values from the metadata-derived effects. It then adds residual noise and fits
+the simplified model. Simplification is needed because SLiM's recording also
+marks historical nodes as samples.
 
-.. literalinclude:: slim_forward_simplified.py
-   :language: python
-   :linenos:
+.. dropdown:: Show the Python driver
+   :color: light
+
+   .. literalinclude:: slim_forward_simplified.py
+      :language: python
+      :linenos:
 
 Run it from the repository root with:
 
@@ -85,33 +85,27 @@ Run it from the repository root with:
 
    uv run python docs/tutorials/slim_forward_simplified.py
 
-The fitted ``sigma_b2`` and ``tau`` should be interpreted as a finite-sample
-check, not as an exact recovery guarantee. The forward population is short
-relative to the paper's large burn-in studies, and each phenotype vector gives
-limited information about a frequency-shape parameter. Always inspect the
-reported ``FitDiagnostics`` for convergence, conditioning, trace error, and
-boundary warnings.
+The fitted ``sigma_b2`` and ``tau`` are finite-sample estimates, not exact
+recovery targets. The short population history and one phenotype vector per
+replicate leave limited information about the frequency-shape parameter.
+Inspect ``FitDiagnostics`` before interpreting an individual fit.
 
 Summary figure
 --------------
 
-The script produces a two-panel diagnostic: the left panel compares the
-forward-simulated ``alpha_j^2`` values from the first replicate to two
-different summaries on the minor-allele-frequency scale. The solid red curve
-is the fitted parametric evolutionary prior
+The script produces a two-panel summary. The left panel compares realized
+``alpha_j^2`` values among segregating variants in the first replicate with two
+summaries on the minor-allele-frequency scale. The solid red curve is the
+fitted evolutionary prior
 ``E[beta_j^2 | x_j] = sigma_b2 / (1 + 2 * tau * x_j * (1 - x_j))``;
-the dashed purple curve is a local linear regression of the simulated effect
-squares. Folding to minor allele frequency removes the visually misleading
-uptick near frequency one that appears when plotting the symmetric
-``x * (1 - x)`` formula on the full allele-frequency interval. The right
-panel shows box plots of the fitted variance components across all ten
-replicates. The dotted line segment at each parameter position marks that
-component's generating value; the right panel uses a linear y-axis.
+the dashed purple curve is a local linear summary of the same segregating
+variants. Folding to minor allele frequency displays the symmetry in
+``x * (1 - x)`` directly. The right panel shows fitted variance components
+across all ten replicates; dotted segments mark their generating values.
 
-The result below is a pre-generated local asset. This keeps hosted
-documentation builds from rerunning the 2,000-individual SLiM simulation and
-the ten GRG-backed fits. Regenerate it, together with the other tutorial
-figures, from the repository root with ``uv run python docs/generate_figures.py``.
+The figure is a pre-generated asset. To regenerate it and the other tutorial
+figures, run ``uv run python docs/generate_figures.py`` from the repository
+root.
 
 .. image:: ../_static/generated/slim_forward_simplified.png
    :alt: Forward-simulation effect spectrum and fitted simplified prior summary
