@@ -128,6 +128,17 @@ invariants:
   model and belongs in a separately named baseline path, under the existing
   rule that baselines are never silently substituted for the evolutionary
   weighting.
+- **Tight solver tolerances are test-fixture settings, never a production
+  rule.** `cg_tol=1e-9` and `trace_probes=64` exist so that small-dataset
+  equivalence and oracle tests are exact. Do not set them as defaults, and do
+  not document them as the way to obtain a trustworthy large-scale estimate:
+  they do not scale, and a reportable estimate requires the production
+  convergence policy instead.
+- **Do not weaken an acceptance gate to match what was built.** If a gate
+  clause is unmet, leave the gate intact and report the clause as open. Adding
+  qualifiers such as "every *implemented* identity" makes a gate self-
+  satisfying and is not permitted. The same applies to marking a work item
+  complete on the strength of a test that cannot fail.
 - The weighted GRM must be symmetric positive semidefinite up to numerical
   tolerance. Validate this property in unit tests.
 - Use stable parameterizations for optimization (for example log-scales for

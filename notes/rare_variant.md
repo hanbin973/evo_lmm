@@ -472,14 +472,32 @@ coordinates in a weakly identified regime.
 
 ### Blocking dependency
 
-The **production convergence policy** is now transferred to the multi-component
-fitter and tested on the current partitioned dense example. It is the same
-score/step rule as the single-component fitter, with the retained defaults
-`trace_probes=12` and `cg_tol=5e-4`, plus the same step cap, damping escalation,
-and near-convergence fallback. Trace standard errors remain diagnostics rather
-than an additional convergence gate. The two-stage sketch/refinement split and
-automatic probe escalation remain deferred cost/precision experiments; they are
-not prerequisites for the current Phase 1 implementation.
+`plan/evolutionary-bolt-lmm.md`'s **production convergence policy is a hard
+prerequisite for any fit whose numbers are used as evidence.** It sits in
+Priority 2 there; this gate does not move with it — a deprioritized prerequisite
+is still a prerequisite. The multi-component fitter reuses the single-component
+score/step rule, which is a prerequisite for the policy, not the policy itself.
+
+**There is currently no interim substitute.** An earlier revision of this file
+said reportable fits could be obtained by hand-raising the budget to
+`(64, 1e-9)`. That was wrong: those are small-dataset verification settings and
+do not scale, so they cannot stand in for a convergence policy on real-sized
+data. Nothing legitimises a large-scale estimate until the policy exists.
+
+**This binds Phase 2, not only Phase 3.** Phase 2 fits at $n \in \{20\text{k},
+50\text{k}\}$ are the primary evidence for the bias-attribution claims, so they
+are exactly the fits that need a trustworthy convergence rule; they are far
+outside small-dataset territory. Phase 3 remains unreachable for want of UKB
+access, but Phase 2 is active, which makes this the critical path rather than a
+moot gate.
+
+The 2026-08-20 audit found the multi-component fitter non-convergent at
+`n=2000`, returning $h^2 = 0.993$ against a realized truth of $0.187$ with a
+REML objective 942 units worse than the truth. Fixing that, and gating it on a
+parameter-recovery test, precedes any Phase 2 run.
+
+The two-stage sketch/refinement split and automatic probe escalation remain
+deferred cost/precision experiments and are not prerequisites here.
 
 ---
 
@@ -514,13 +532,16 @@ start in parallel with everything below.
 Order: MC0 kernel and multi-component REML $\to$ MC1 baselines $\to$ MC2 joint MoM
 $\to$ MC3 reporting. MC4 runs in parallel, needed only for Phase 3.
 
-**Gate:** every implemented rung of the ladder reproduces the rung below it
-exactly at the boundary in the small-dense reference; single-category parity
-uses the existing fitter and default `cg_tol=5e-4`; and the reproduced
+**Gate:** every rung of the ladder reproduces the rung below it exactly at the
+boundary; **dense-versus-GRG equivalence at `cg_tol=1e-9` on a small dataset**;
+single-category parity with the existing fitter bit-for-bit; and the reproduced
 RareEffect estimator matches a from-scratch reimplementation on a small dense
-case. Production AI-REML, block-CG, XTrace, scientific-scale reporting, and
-baseline checks and the adopted convergence rule are present. Priority 2
-trace-error/retry experiments and performance work remain open.
+case. The `1e-9` tolerance is a small-data verification setting and nothing
+else — see the note on tolerances in the ledger's Active workstream gate.
+
+Audited 2026-08-20: parity and the baseline reproduction are met; the nesting
+clause and the dense-versus-GRG clause are not, and the fitter itself does not
+converge at `n=2000`. See the ledger for the specific defects.
 
 ### Phase 2 — Calibrated simulation (primary evidence)
 
@@ -591,8 +612,9 @@ compliance review first.
    annotation tool version, collapsing on/off.
 
 **Gate:** the reproduced baseline agrees with published estimates within their
-reported intervals, and every reported evolutionary fit satisfies the adopted
-single-component score/step convergence rule at the retained sketch budget.
+reported intervals, and every reported evolutionary fit satisfies the production
+convergence policy — not a hand-raised tolerance, which is a small-dataset
+verification setting.
 
 ---
 

@@ -215,7 +215,7 @@ either side is edited.
 Binding model invariants are in `AGENTS.md`, "Annotation-partitioned
 multi-component model". Simplified prior only; the full model is frozen.
 
-- [x] **MC0 — Annotation-partitioned multi-component kernel (simplified prior
+- [ ] **MC0 — Annotation-partitioned multi-component kernel (simplified prior
   only).** Per-category prior objects
   with analytic derivatives in `(log sigma_b_c^2, log tau_c)`; multi-component
   AI-REML profiling one scale and searching the remaining `2|c|` shape
@@ -225,11 +225,11 @@ multi-component model". Simplified prior only; the full model is frozen.
 - [x] **MC1 — Named baselines.** The flat per-category prior; RareEffect's
   marginal ML plus MoM-ratio adjustment including its negative-MoM truncation
   rule, reproduced faithfully; an optional MAC-threshold collapsing operator.
-- [x] **MC2 — Joint multi-component MoM / Haseman–Elston.** Generalize
+- [ ] **MC2 — Joint multi-component MoM / Haseman–Elston.** Generalize
   `haseman_elston_initialization()` to the `(|c|+1)`-dimensional moment system.
   Initialization matters more here than in the single-component case: six shape
   coordinates, several weakly identified by construction.
-- [x] **MC3 — Estimand adapters and reporting.** Both heritability conventions;
+- [ ] **MC3 — Estimand adapters and reporting.** Both heritability conventions;
   per-MAF-bin genic-variance decomposition; scientific-scale delta-method
   standard errors plus profile likelihoods for each `sigma_b2_c` and `tau_c`;
   boundary-aware likelihood-ratio tests;
@@ -241,16 +241,43 @@ multi-component model". Simplified prior only; the full model is frozen.
 
 Order: MC0, then MC1, then MC2, then MC3. MC4 is independent and deferred.
 
-Acceptance gate: every implemented nesting identity holds exactly in the
-small-dense reference tests; single-category fitting delegates bit-for-bit to
-the existing fitter at the default `cg_tol=5e-4`; and the reproduced RareEffect
-baseline matches an independent small-dense reimplementation.
+Acceptance gate. All four clauses, no qualifiers:
 
-Current open gates:
+1. **Every** nesting identity holds exactly — not "every implemented" one. An
+   identity that is not yet tested is an open gate, not a satisfied one.
+2. **Dense-versus-GRG equivalence at `cg_tol=1e-9`, on a small dataset.** This
+   clause was deleted once and is restored deliberately. It is a small-data
+   equivalence check by design: the point is to pin the GRG traversal against a
+   dense oracle where the dense oracle is computable at all.
+3. Single-category fitting delegates to the existing fitter bit-for-bit.
+4. The reproduced RareEffect baseline matches an independent reimplementation on
+   a small dense case.
 
-- Priority 2 trace-error/retry experiments and production-scale performance
-  characterization; the adopted score/step convergence rule is implemented and
-  tested for the current multi-component scope.
+**Tight tolerances are test-fixture settings, never a production rule.**
+`cg_tol=1e-9` and `trace_probes=64` exist to make small-dataset verification
+exact. They are not the route to a trustworthy large-scale estimate and must
+never be documented as one — they do not scale, and presenting them as the
+interim production path was an error in an earlier revision of these documents.
+A reportable large-scale estimate requires the production convergence policy
+(Priority 2), which is open.
+
+Gate status, audited 2026-08-20 — **clauses 1 and 2 are not met.** Clause 1: the
+`tau_c = 0` identity is verified against the evolutionary path with the scale
+factored out rather than against the named flat baseline, the shared-`tau` and
+fit-ladder tests compare identically-constructed priors, and `dK/dlog tau` has
+no finite-difference check. Clause 2: no dense-versus-GRG test for the
+partitioned kernel exists. Clauses 3 and 4 are met and independently confirmed.
+
+Blocking defects found in the same audit, ahead of any further checkboxes:
+
+- The multi-component fitter does not converge or recover parameters. At
+  `n=2000` with two categories it returns `converged=False`, `h2 = 0.993`
+  against a truth of `0.187`, and `tau` collapsed to zero; the exact profiled
+  REML objective is `1050.6` at the returned point against `108.6` at the truth.
+- `multicomponent.py:550` propagates the `np.nan` initialiser of
+  `last_sigma_e2` into `SimplifiedPrior`, raising `ValueError: sigma_b2 must be
+  finite and strictly positive` on any loop exit that precedes the in-loop
+  assignment (`max_iter=0` reproduces it).
 
 ## Remaining work
 
@@ -351,19 +378,27 @@ rare-variant reanalysis reaches Phase 3, or Phase 3 waits.
 
 The stochastic defaults remain the cheap end of the range: `trace_probes=12` and
 `cg_tol=5e-4`, the latter matching GRAPP's solver budget so per-application work
-is comparable. The multi-component fitter now uses the same score/step rule as
-the single-component fitter, including step capping, damping escalation, and
-the near-convergence fallback. This deliberately retains the sketch tolerance:
-trace standard errors remain diagnostics and are not an additional convergence
-gate.
+is comparable. The multi-component fitter reuses the single-component score/step
+rule, including step capping, damping escalation, and the near-convergence
+fallback — but reusing that rule is not the same as having a production
+convergence policy, and the item below stays open.
+
+`trace_probes=64` and `cg_tol=1e-9` are **small-dataset verification settings**.
+They belong in equivalence and oracle tests and nowhere else. They are not a
+production rule and are not an interim substitute for a convergence policy on
+real-sized data; an earlier revision of these documents wrongly presented them
+as the route to a reportable estimate.
 
 The documentation benchmark intentionally caps optimization at eight iterations
 and reports secant/convergence warnings from the comparison path. That setup is
-useful for timing; the production rule itself is now shared with the
-single-component fitter.
+useful for timing and is not a convergence policy.
 
-- [x] Define and test the multi-component convergence policy by transferring
-  the single-component score/step rule at the retained sketch tolerance.
+- [ ] Define and test a production convergence policy independently of the
+  matched-budget benchmark. Re-opened by the 2026-08-20 audit: the only test
+  backing this passed `tol=1e9` against a true `score_norm` of 2.92, so it
+  cannot fail, and the fitter demonstrably does not converge at `n=2000`.
+  Transferring the single-component score/step rule is a prerequisite, not the
+  policy.
 - [ ] Add explicit tests for trace-error-driven non-convergence and any retry or
   probe-budget escalation policy. These remain deferred because the chosen
   policy keeps the sketch tolerance and does not add automatic refinement.
