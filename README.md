@@ -1,134 +1,36 @@
 [![Documentation Status](https://readthedocs.org/projects/evo-lmm/badge/?version=latest)](https://evo-lmm.readthedocs.io/en/latest/)
+[![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
 
 # evo-lmm
 
-`evo-lmm` is a Python implementation of the evolutionary random-effects
-model developed in [the accompanying notes](notes/stab1_genetics_template.pdf).
-It couples a stabilizing-selection model to a linear mixed model (LMM), using
-[GRGL](https://github.com/hanbin973/grgl) to store and traverse genotype
-representation graphs efficiently.
+`evo-lmm` fits **evolutionary random-effects linear mixed models**: LMMs in which
+the prior variance of each SNP effect is derived from a stabilizing-selection
+model rather than assumed from an empirical alpha-model. Variance components are
+estimated by REML and genetic values by BLUP, with all genotype operations
+carried out directly on
+[genotype representation graphs (GRG)](https://github.com/aprilweilab/grgl) so
+that biobank-scale genotype matrices are never materialized.
 
-## Model at a glance
+The scientific specification lives in
+[the accompanying notes](notes/stab1_genetics_template.pdf), which are the source
+of truth for the model; the code follows them.
 
-For phenotype vector `y` and genotype matrix `G`, the target model is
+* **Selection-derived priors** — SNP-effect variance follows from Fisher's
+  geometric model of stabilizing selection, with two nested model families.
+* **GRG-backed** — genotype products run through
+  [GRGL](https://github.com/aprilweilab/grgl) and
+  [GRAPP](https://github.com/aprilweilab/grapp) operators; no dense `N x M`
+  matrix is formed.
+* **BOLT-LMM style inference** — conjugate-gradient trace estimation and REML
+  variance-component optimization, with LOCO support.
+* **Simulation utilities** — [msprime](https://tskit.dev/msprime/) tree
+  sequences converted to GRG, with phenotypes drawn from the postulated prior,
+  for end-to-end verification.
 
-```text
-y = G beta + epsilon.
-```
-
-Instead of assigning SNP-effect variance with an empirical alpha-model, the
-notes derive it from Fisher's geometric model of stabilizing selection. For
-variant `j`, with sample allele frequency `x_hat_j`, the main-text variance is
-
-```text
-E[beta_j^2 | G_j]
-  = sigma_b^2 * (1 - rho_ab^2 *
-      (2 (sigma_a^2 / W_S) x_hat_j (1 - x_hat_j)) /
-      (1 + 2 (sigma_a^2 / W_S) x_hat_j (1 - x_hat_j))).
-```
-
-The implementation will form the corresponding frequency-weighted genetic
-relatedness matrix, estimate its variance components by REML, and produce
-genetic-value predictions with BLUP. It supports two nested model families,
-where `q_j = x_hat_j (1 - x_hat_j)`:
-
-| Model | SNP-effect variance | Free parameters |
-| --- | --- | --- |
-| Simplified evolutionary model | `sigma_b^2 / (1 + 2 * tau * q_j)` | `sigma_b^2`, `tau` |
-| Full evolutionary model | `sigma_b^2 * (1 - rho_ab^2 * (2 * tau * q_j) / (1 + 2 * tau * q_j))` | `sigma_b^2`, `rho_ab`, `tau` |
-
-Here `tau = sigma_a^2 / W_S` is the selection-frequency aggregate,
-`sigma_b^2` is the focal-trait effect scale, and `rho_ab` controls coupling
-between the focal and selected traits. The simplified model is the exact
-`rho_ab^2 = 1` specialization of the full model; it has two estimable
-parameters because the coupling is fixed rather than separately estimated.
-
-## Repository layout
-
-```text
-.
-├── grgl/       Git submodule: native GRGL library and its Python package
-├── grapp/      Git submodule: reference GRGL-backed BOLT-LMM implementation
-├── notes/      Scientific specification for the evolutionary model
-├── plan/       Concrete implementation plans
-├── src/evo_lmm/ First-party evolutionary LMM package
-├── tests/      Dense, GRG, REML, and LOCO verification
-├── main.py     Temporary command-line entry point
-├── pyproject.toml
-└── AGENTS.md   Development conventions and model invariants
-```
-
-## Installation
-
-Prerequisites:
-
-- Python 3.12 or later
-- [uv](https://docs.astral.sh/uv/)
-- CMake and a C++17-capable compiler, required to build GRGL's native Python
-  extension
-- Git (with submodule support)
-
-Clone with its submodule, then create the environment and build all Python and
-native dependencies:
-
-```bash
-git clone --recurse-submodules <repository-url>
-cd evo_lmm
-uv sync
-```
-
-For an existing checkout, initialize the submodule before syncing:
-
-```bash
-git submodule update --init --recursive
-uv sync
-```
-
-`uv` installs the GRGL submodule's Python distribution, `pygrgl`, and the GRAPP
-reference implementation as editable local dependencies. The first-party
-package accesses GRAPP through a small compatibility adapter; neither
-submodule is modified by evo-lmm changes.
-
-Verify the setup with:
-
-```bash
-uv run python -c "import evo_lmm, pygrgl, grapp, msprime, numpy, scipy, tskit; print('environment ready')"
-```
-
-## Development
-
-Run the current entry point with `uv run python main.py`. Keep dependency
-changes in `pyproject.toml` and regenerate the lockfile with `uv lock` (or
-`uv sync`). See [AGENTS.md](AGENTS.md) for implementation conventions.
-
-## Documentation
-
-The documentation follows the Sphinx layout used by GRGL and GRAPP. Install
-the documentation dependencies through the uv development group and build the
-HTML site with:
-
-```bash
-uv sync
-uv run sphinx-build -W -b html docs docs/_build/html
-```
-
-The generated site includes the [public API](docs/reference/public_api.rst) and
-a ten-replicate, 1,000-individual variance-component tutorial with box plots.
-
-## Library example
-
-The public API keeps evolutionary model weights separate from the
-BOLT-normalised test-genotype operator. This example simulates a diploid
-msprime tree sequence, converts it to GRG through `pygrgl.grg_from_trees`,
-samples raw-dosage effects from the postulated prior, and fits the resulting
-phenotype through the GRG-backed path.
+## Quickstart
 
 ```python
-from evo_lmm import (
-    SimplifiedPrior,
-    fit_evolutionary_bolt_lmm,
-    simulate_grg_lmm,
-)
+from evo_lmm import SimplifiedPrior, fit_evolutionary_bolt_lmm, simulate_grg_lmm
 
 simulation = simulate_grg_lmm(
     SimplifiedPrior(sigma_b2=0.8, tau=0.5),
@@ -150,13 +52,114 @@ fit = fit_evolutionary_bolt_lmm(
 print(fit.prior, fit.sigma_e2, fit.diagnostics.converged)
 ```
 
-`SimplifiedPrior` is the exact `rho^2 = 1` specialization of `FullPrior`.
-`sigma_b2` is the raw-dosage per-locus effect scale; no implicit `1/M` kernel
-normalization is applied. `tau=0`, `rho=0`, monomorphic frequencies, and the
-full-model `rho=1` boundary are supported explicitly and reported in fit
-diagnostics when they are weakly identified.
+`sigma_b2` is the raw-dosage per-locus effect scale; no implicit `1 / M` kernel
+normalization is applied. The boundary cases `tau = 0`, `rho = 0`, monomorphic
+frequencies, and the full-model `rho = 1` limit are supported explicitly and
+flagged in the fit diagnostics when weakly identified.
 
-The notes are the scientific source of truth. In particular, preserve the
-distinction between the observed focal-trait effect `beta_j` and the latent
-fitness-trait effect vector `alpha_j` when translating the derivation into
-code.
+## The model
+
+For phenotype vector `y` and raw diploid dosage matrix `G`,
+
+```text
+y = G beta + epsilon,
+```
+
+with `beta_j` random and, writing `q_j = x_hat_j (1 - x_hat_j)` for the sample
+allele frequency heterozygosity at variant `j`:
+
+| Model | SNP-effect variance `E[beta_j^2 given G_j]` | Free parameters |
+| --- | --- | --- |
+| Simplified evolutionary model | `sigma_b^2 / (1 + 2 tau q_j)` | `sigma_b^2`, `tau` |
+| Full evolutionary model | `sigma_b^2 (1 - rho_ab^2 (2 tau q_j) / (1 + 2 tau q_j))` | `sigma_b^2`, `rho_ab`, `tau` |
+
+Here `tau = sigma_a^2 / W_S` is the selection-frequency aggregate, `sigma_b^2`
+the focal-trait effect scale, and `rho_ab` the coupling between the focal and
+the latent selected trait. The simplified model is the exact `rho_ab^2 = 1`
+specialization of the full model. Throughout, the observed focal-trait effect
+`beta_j` and the latent fitness-trait effect vector `alpha_j` are kept distinct.
+
+## Installation
+
+Prerequisites: Python 3.12+, [uv](https://docs.astral.sh/uv/), Git with
+submodule support, and CMake with a C++17 compiler (to build GRGL's native
+Python extension).
+
+```bash
+git clone --recurse-submodules https://github.com/hanbin973/evo_lmm.git
+cd evo_lmm
+uv sync
+```
+
+For an existing checkout:
+
+```bash
+git submodule update --init --recursive
+uv sync
+```
+
+`uv` installs the GRGL submodule's Python distribution (`pygrgl`) and the GRAPP
+reference implementation as editable local dependencies; `evo-lmm` reaches GRAPP
+through a small compatibility adapter and never modifies either submodule.
+Verify with:
+
+```bash
+uv run python -c "import evo_lmm, pygrgl, grapp, msprime, numpy, scipy, tskit; print('environment ready')"
+```
+
+## Documentation
+
+Full documentation is at
+[evo-lmm.readthedocs.io](https://evo-lmm.readthedocs.io/en/latest/), organized as
+overview, how-to guides, tutorials, and
+[API reference](docs/reference/public_api.rst) — the same layout used by GRGL and
+GRAPP. It includes a ten-replicate, 1,000-individual variance-component recovery
+tutorial. To build locally:
+
+```bash
+uv sync
+uv run sphinx-build -W -b html docs docs/_build/html
+```
+
+## Development
+
+```bash
+uv run pytest          # dense, GRG, REML, and LOCO verification
+uv run python main.py  # temporary command-line entry point
+```
+
+Dependency changes belong in `pyproject.toml`, with the lockfile regenerated via
+`uv lock` (or `uv sync`). [AGENTS.md](AGENTS.md) records the implementation
+conventions and model invariants that changes must preserve.
+
+Repository layout:
+
+```text
+.
+├── grgl/         Submodule: native GRGL library and its Python package
+├── grapp/        Submodule: reference GRGL-backed BOLT-LMM implementation
+├── notes/        Scientific specification for the evolutionary model
+├── plan/         Implementation plans
+├── src/evo_lmm/  First-party evolutionary LMM package
+├── tests/        Dense, GRG, REML, and LOCO verification
+├── docs/         Sphinx documentation
+└── AGENTS.md     Development conventions and model invariants
+```
+
+## Citation
+
+If you use `evo-lmm`, please cite the paper describing the model:
+
+> Lee, H., & Terhorst, J. (2026). Parameterizing the genetic architecture under
+> stabilizing selection. *Genetics*.
+> https://doi.org/10.1093/genetics/iyag180
+
+Please also cite the GRG papers that the genotype backend rests on:
+
+> DeHaas, D., Pan, Z., & Wei, X. (2025). Enabling efficient analysis of
+> biobank-scale data with genotype representation graphs.
+> *Nature Computational Science*, 5(2), 112–124.
+
+> DeHaas, D., Adonizio, C., Pan, Z., & Wei, X. (2026). General,
+> orders-of-magnitude faster whole-genome analysis with genotype representation
+> graphs. *bioRxiv*. https://doi.org/10.64898/2026.04.10.717786
