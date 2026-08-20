@@ -415,19 +415,24 @@ coordinates in a weakly identified regime.
 
 ### Blocking dependency
 
-`plan/evolutionary-bolt-lmm.md` **Priority 1 (production convergence policy) is
-a hard prerequisite for any reported estimate.** Current defaults
+`plan/evolutionary-bolt-lmm.md`'s **production convergence policy is a hard
+prerequisite for any reported estimate.** That work has since been lowered to
+Priority 2 there; this gate does not move with it — a deprioritized prerequisite
+is still a prerequisite. Current defaults
 (`trace_probes=12`, `cg_tol=5e-4`) are documented as exploratory, and the same
 plan records a non-converged fit near the $h^2$ boundary producing
 $\lambda_{GC} \approx 1.7$ on null data. M2 has six shape coordinates, several
 of them weakly identified by construction (§2.2) — a strictly harder
 optimization problem than the two-parameter fits that policy was written for.
 Do not begin Phase 3 before that convergence policy exists and is tested at
-$|c| = 3$. It does **not** depend on the two-stage sketch/refinement scheme,
-which is a Priority 2 cost optimization: reportable multi-component fits are
-obtained by raising the probe budget by hand to the documented `(64, 1e-9)` pair
-and confirming `FitDiagnostics.trace_standard_errors` resolves the score above
-trace noise.
+$|c| = 3$. It does **not** depend on the other Priority 2 trace item, the
+two-stage sketch/refinement split, which is a pure cost optimization:
+reportable multi-component fits are obtained by raising the probe budget by hand
+to the documented `(64, 1e-9)` pair and confirming
+`FitDiagnostics.trace_standard_errors` resolves the score above trace noise.
+**Accept the consequence explicitly: Phase 3 is gated on a Priority 2 item, so
+either the convergence work is pulled forward when Phase 3 approaches, or
+Phase 3 waits.**
 
 ---
 

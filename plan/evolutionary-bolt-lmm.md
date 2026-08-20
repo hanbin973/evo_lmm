@@ -204,48 +204,58 @@ fit is stopped at a small iteration cap and leaves `h2` near its upper boundary
 on null data, the calibrated statistic inflates (`lambda_GC` around 1.7). The
 same null data with a converged fit gives `lambda_GC` in line with plain
 regression. Calibration corrects the statistic's scale, not a variance-component
-fit that has not converged, which is why the convergence-policy work below is
-the next gate.
+fit that has not converged, which is why the convergence-policy work, now under
+Priority 2, remains a gate on any reported estimate.
 
-### Priority 1: harden fitting for routine production use
+### Priority 1: reporting-surface correctness
 
-The stochastic defaults are now the cheap end of the range: `trace_probes=12`
-and `cg_tol=5e-4`, the latter matching GRAPP's solver budget so per-application
-work is comparable. On a two-chromosome `N=200` GRG fit this is `8.6x` faster
-than the previous `(64, 1e-9)` pair for a `2-3x` increase in trace standard
-error and point estimates agreeing to three significant figures. These defaults
-are for exploratory fits and benchmark parity, not for reported estimates; the
-dense-oracle and dense/GRG equivalence tests pin `cg_tol=1e-9` explicitly. For
-now a reportable estimate is obtained by raising the budget by hand — `(64,
-1e-9)` is the documented target pair — and reading
-`FitDiagnostics.trace_standard_errors` to confirm the score is resolved above
-trace noise. Making that choice automatic is the two-stage sketch/refinement
-item under Priority 2; it is a cost optimization, not a prerequisite for a
-correct reported estimate.
+Convergence-policy work has moved to Priority 2. What remains here is the
+correctness of what a fit reports once it has converged, which is independent of
+how convergence is declared.
 
-The documentation benchmark intentionally caps optimization at eight
-iterations and reports secant/convergence warnings from the comparison path.
-That setup is useful for timing but is not a production convergence policy.
-
-- [ ] Define and test a production convergence policy independently of the
-  matched-budget benchmark.
 - [x] Wire `haseman_elston_initialization()` into `fit_reml()` as the optional
   `initialization="he"` mode. The default remains unchanged.
-- [ ] Add explicit tests for trace-error-driven non-convergence and any retry or
-  probe-budget escalation policy before implementing automatic escalation.
 - [ ] Verify fixed-effect reporting and phenotype rescaling on nonstandardized
   phenotypes with multiple covariates.
 - [ ] Add a stable serialization/reporting surface if fit results must persist
   beyond the Python process.
 
-Acceptance gate: default CPU fits converge reliably on representative
-simplified simulations, and failures return actionable diagnostics rather than
-plausible-looking estimates.
+Acceptance gate: reported fixed effects, rescaled phenotypes, and persisted fit
+results round-trip correctly on nonstandardized phenotypes with multiple
+covariates.
 
-### Priority 2: close the remaining performance gap
+### Priority 2: convergence policy and the remaining performance gap
 
 Warm starts removed most redundant CG work, but the ten-replicate benchmark
 still shows evo-lmm slower than GRAPP. Profile before adding more machinery.
+
+This section also now owns the convergence-policy work, lowered from Priority 1
+on the judgement that it can be tested later. Note what that costs: a
+deprioritized prerequisite is still a prerequisite, and
+`notes/rare_variant.md` deliberately keeps its Phase 3 gate on the convergence
+policy rather than relaxing it. Either this work gets pulled forward when the
+rare-variant reanalysis reaches Phase 3, or Phase 3 waits.
+
+The stochastic defaults are the cheap end of the range: `trace_probes=12` and
+`cg_tol=5e-4`, the latter matching GRAPP's solver budget so per-application work
+is comparable. On a two-chromosome `N=200` GRG fit this is `8.6x` faster than
+the previous `(64, 1e-9)` pair for a `2-3x` increase in trace standard error and
+point estimates agreeing to three significant figures. These defaults are for
+exploratory fits and benchmark parity, not for reported estimates; the
+dense-oracle and dense/GRG equivalence tests pin `cg_tol=1e-9` explicitly. Until
+the policy work below lands, a reportable estimate is obtained by raising the
+budget by hand — `(64, 1e-9)` is the documented target pair — and reading
+`FitDiagnostics.trace_standard_errors` to confirm the score is resolved above
+trace noise.
+
+The documentation benchmark intentionally caps optimization at eight iterations
+and reports secant/convergence warnings from the comparison path. That setup is
+useful for timing but is not a production convergence policy.
+
+- [ ] Define and test a production convergence policy independently of the
+  matched-budget benchmark.
+- [ ] Add explicit tests for trace-error-driven non-convergence and any retry or
+  probe-budget escalation policy before implementing automatic escalation.
 
 - [ ] Attribute remaining time to GRG traversals, derivative construction,
   trace queries, Python orchestration, LOCO setup, and optimizer evaluations.
@@ -279,10 +289,15 @@ still shows evo-lmm slower than GRAPP. Profile before adding more machinery.
   the dominant measured cost. Include sketch construction and refresh time in
   the comparison.
 
-Acceptance gate: report end-to-end time, estimate changes, convergence status,
-and operator-equivalent work over multiple persisted replicates. For the
-two-stage item specifically, the gate is that estimates and convergence match a
-single-stage fit run entirely at the refinement budget, at lower total cost.
+Acceptance gate, convergence: default CPU fits converge reliably on
+representative simplified simulations, and failures return actionable
+diagnostics rather than plausible-looking estimates.
+
+Acceptance gate, performance: report end-to-end time, estimate changes,
+convergence status, and operator-equivalent work over multiple persisted
+replicates. For the two-stage item specifically, the gate is that estimates and
+convergence match a single-stage fit run entirely at the refinement budget, at
+lower total cost.
 
 ### Priority 3: GPU and user-facing interfaces
 
@@ -344,7 +359,7 @@ The next milestone is not another covariance-kernel prototype. It is a
 calibrated, end-to-end CPU analysis path in which:
 
 1. simplified evolutionary fits converge with clear diagnostics
-   (open: Priority 1);
+   (open: Priority 2);
 2. LOCO association uses the fitted evolutionary covariance and independent
    BOLT-normalized test columns (done);
 3. null calibration and dense/GRG equivalence tests pass (done);
