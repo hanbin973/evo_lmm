@@ -245,8 +245,6 @@ That setup is useful for timing but is not a production convergence policy.
     converged by chance.
 - [x] Wire `haseman_elston_initialization()` into `fit_reml()` as the optional
   `initialization="he"` mode. The default remains unchanged.
-- [ ] Add a matrix-free full-model GRG recovery test away from the `rho`
-  boundaries.
 - [ ] Add explicit tests for trace-error-driven non-convergence and any retry or
   probe-budget escalation policy before implementing automatic escalation.
 - [ ] Verify fixed-effect reporting and phenotype rescaling on nonstandardized
@@ -255,8 +253,8 @@ That setup is useful for timing but is not a production convergence policy.
   beyond the Python process.
 
 Acceptance gate: default CPU fits converge reliably on representative
-simplified and full simulations, and failures return actionable diagnostics
-rather than plausible-looking estimates.
+simplified simulations, and failures return actionable diagnostics rather than
+plausible-looking estimates.
 
 ### Priority 2: close the remaining performance gap
 
@@ -286,11 +284,22 @@ and operator-equivalent work over multiple persisted replicates.
   if command-line fitting is required.
 - [ ] Decide whether association results need DataFrame/file-output adapters;
   keep the core typed-array API independent of a tabular dependency.
-- [ ] Add curated end-to-end examples for the full model and calibrated
-  association once those paths are production-ready.
+- [ ] Add curated end-to-end examples for calibrated association once that
+  path is production-ready.
 
 ## Deferred or rejected for now
 
+- The **full evolutionary model is frozen, not removed.** `FullPrior`, the
+  `rho^2 = 1` nested identity, and the existing boundary tests stay exactly as
+  they are and must keep passing; the simplified model remains its exact
+  `rho^2 = 1` specialization. What moves to future work is all *further*
+  full-model development, specifically the matrix-free full-model GRG recovery
+  test away from the `rho` boundaries and curated end-to-end full-model
+  examples. Rationale: under a U-shaped allele-frequency spectrum the data
+  mainly identify the product `rho_ab^2 * sigma_a^2 / W_S` rather than its
+  factors, so `rho^2` is weakly identified in practice. See
+  `notes/rare_variant.md` section 2.2. Development effort goes to the
+  annotation-partitioned simplified model instead.
 - XTrace is not the default: current equal-cost experiments do not show a
   consistent error advantage over Hutchinson.
 - Five trace probes are not sufficient for final refinement by default: the
@@ -326,7 +335,7 @@ belongs to the Priority 1 convergence-policy item. Generated simulation artifact
 The next milestone is not another covariance-kernel prototype. It is a
 calibrated, end-to-end CPU analysis path in which:
 
-1. simplified and full evolutionary fits converge with clear diagnostics
+1. simplified evolutionary fits converge with clear diagnostics
    (open: Priority 1);
 2. LOCO association uses the fitted evolutionary covariance and independent
    BOLT-normalized test columns (done);
