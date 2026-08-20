@@ -241,7 +241,7 @@ def _quantities(
     probes: np.ndarray,
     *,
     exact: bool,
-    cg_tol: float = 1e-9,
+    cg_tol: float = 5e-4,
     exclude_chrom: Any = None,
     initial_cache: Mapping[str, np.ndarray] | None = None,
     trace_method: str = "hutchinson",
@@ -394,11 +394,11 @@ def fit_reml(
     model: str | None = None,
     initial: Any = None,
     delta: float = 1.0,
-    trace_probes: int = 64,
+    trace_probes: int = 12,
     seed: int = 0,
     max_iter: int = 50,
     tol: float = 1e-6,
-    cg_tol: float = 1e-9,
+    cg_tol: float = 5e-4,
     max_step: float = 2.0,
     exact: bool | None = None,
     trace_method: str = "hutchinson",
@@ -409,8 +409,15 @@ def fit_reml(
 
     ``sigma_b2`` is profiled as ``y'P_H y / (N-rank(C))`` and ``sigma_e2`` is
     derived as ``delta*sigma_b2``. Dense operators use exact traces by default;
-    matrix-free operators use fixed spherical XTrace vectors and warm-started
-    projected CG solves.
+    matrix-free operators use fixed Rademacher probes (Hutchinson) and
+    warm-started projected CG solves.
+
+    The stochastic defaults are deliberately cheap and match GRAPP's solver
+    budget: ``trace_probes=12`` and ``cg_tol=5e-4``. They are appropriate for
+    exploratory fits and for benchmark parity, not for final reported
+    estimates. Raise both (for example ``trace_probes=64``, ``cg_tol=1e-9``)
+    when an estimate is reportable, and check
+    ``FitDiagnostics.trace_standard_errors`` before trusting a score.
     """
 
     if model is not None and model != ops.model_name:
@@ -661,7 +668,7 @@ def haseman_elston_initialization(
     y: np.ndarray,
     prior: EvolutionaryPrior,
     *,
-    probes: int = 64,
+    probes: int = 12,
     seed: int = 0,
 ) -> tuple[float, float, float]:
     """Estimate ``(sigma_b2, sigma_e2, delta)`` by projected HE moments.

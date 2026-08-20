@@ -28,6 +28,12 @@ from evo_lmm.calibration import CALIBRATION_STD_LIMIT
 from evo_lmm.grapp_backend import raw_operator_class
 from evo_lmm.results import FitDiagnostics, FitResult
 
+# The production default CG tolerance matches GRAPP's loose ``5e-4``.  Tests
+# that compare against an explicit dense pseudo-inverse, or that assert the
+# exact ``rho^2 = 1`` nested identity, pin a tight tolerance instead so they
+# measure the formulas rather than the solver's truncation.
+ORACLE_CG_TOL = 1e-9
+
 
 # ---------------------------------------------------------------------------
 # helpers
@@ -43,7 +49,7 @@ def _fixed_result(ops, y, prior, delta):
 
     projected = ops.project(np.asarray(y, dtype=np.float64))
     coordinates = prior.coordinates(delta)
-    ph_y = ops.solve_ph(projected, coordinates)
+    ph_y = ops.solve_ph(projected, coordinates, tol=ORACLE_CG_TOL)
     q = float(projected @ ph_y)
     sigma_b2 = q / max(ops.dim, 1)
     diagnostics = FitDiagnostics(
@@ -112,7 +118,7 @@ def test_association_matches_dense_pseudoinverse_oracle():
     result = _fixed_result(ops, y, prior, delta)
 
     selected, _ = select_calibration_variants(result, count=6, seed=5)
-    computed = calibrate_association(result, count=6, seed=5)
+    computed = calibrate_association(result, count=6, seed=5, cg_tol=ORACLE_CG_TOL)
     assert list(computed.selected) == list(selected)
 
     dim = float(ops.dim)
@@ -154,7 +160,7 @@ def test_association_matches_dense_pseudoinverse_oracle():
         factor = float(np.median(pro) / np.median(retro))
     assert computed.factor == pytest.approx(factor, rel=1e-6)
 
-    results = association(result, calibration=computed)
+    results = association(result, calibration=computed, cg_tol=ORACLE_CG_TOL)
     for item in results:
         chrom = item.chrom
         stats = ops.test_stats(chrom)
@@ -215,8 +221,8 @@ def test_full_model_at_rho2_one_matches_simplified_association():
     full = _fixed_result(full_ops, y, FullPrior(sigma_b2=1.0, tau=tau, rho=1.0), delta)
 
     assert simplified.sigma_b2 == pytest.approx(full.sigma_b2, rel=1e-10)
-    left = association(simplified, calibration_variants=6, seed=13)
-    right = association(full, calibration_variants=6, seed=13)
+    left = association(simplified, calibration_variants=6, seed=13, cg_tol=ORACLE_CG_TOL)
+    right = association(full, calibration_variants=6, seed=13, cg_tol=ORACLE_CG_TOL)
     assert [item.chrom for item in left] == [item.chrom for item in right]
     for a, b in zip(left, right):
         assert a.calibration_factor == pytest.approx(b.calibration_factor, rel=1e-9)
@@ -263,7 +269,18 @@ def test_dense_and_grg_association_agree(two_chromosome_grgs):
     dense_chroms = {"1": _dense_genotypes(left.grg), "2": _dense_genotypes(right.grg)}
     np.testing.assert_allclose(dense_chroms["1"].mean(axis=0) / 2.0, left.frequencies, atol=1e-12)
 
-    settings = dict(model="simplified", initial=SimplifiedPrior(0.5, 0.5), max_iter=3, trace_probes=8, seed=41)
+    # Dense and GRG operators are mathematically identical, so this test pins
+    # the tight CG tolerance: at the production default the two paths agree
+    # only to the solver's truncation level, which would mask a real
+    # operator-level discrepancy.
+    settings = dict(
+        model="simplified",
+        initial=SimplifiedPrior(0.5, 0.5),
+        max_iter=3,
+        trace_probes=8,
+        seed=41,
+        cg_tol=ORACLE_CG_TOL,
+    )
     grg_fit = fit_evolutionary_bolt_lmm(grg_chroms, phenotype, **settings)
     dense_fit = fit_evolutionary_lmm(dense_chroms, phenotype, exact=False, **settings)
 
@@ -271,8 +288,8 @@ def test_dense_and_grg_association_agree(two_chromosome_grgs):
     assert grg_fit.tau == pytest.approx(dense_fit.tau, rel=1e-6)
     assert grg_fit.delta == pytest.approx(dense_fit.delta, rel=1e-6)
 
-    grg_assoc = association(grg_fit, calibration_variants=8, seed=7)
-    dense_assoc = association(dense_fit, calibration_variants=8, seed=7)
+    grg_assoc = association(grg_fit, calibration_variants=8, seed=7, cg_tol=ORACLE_CG_TOL)
+    dense_assoc = association(dense_fit, calibration_variants=8, seed=7, cg_tol=ORACLE_CG_TOL)
     for a, b in zip(grg_assoc, dense_assoc):
         assert a.chrom == b.chrom
         np.testing.assert_array_equal(a.local_idx, b.local_idx)

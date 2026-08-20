@@ -209,6 +209,16 @@ the next gate.
 
 ### Priority 1: harden fitting for routine production use
 
+The stochastic defaults are now the cheap end of the range: `trace_probes=12`
+and `cg_tol=5e-4`, the latter matching GRAPP's solver budget so per-application
+work is comparable. On a two-chromosome `N=200` GRG fit this is `8.6x` faster
+than the previous `(64, 1e-9)` pair for a `2-3x` increase in trace standard
+error and point estimates agreeing to three significant figures. These defaults
+are for exploratory fits and benchmark parity, not for reported estimates; the
+dense-oracle and dense/GRG equivalence tests pin `cg_tol=1e-9` explicitly. The
+two-stage sketch/refinement policy below is what should eventually make the
+choice automatic rather than a documented caveat.
+
 The documentation benchmark intentionally caps optimization at eight
 iterations and reports secant/convergence warnings from the comparison path.
 That setup is useful for timing but is not a production convergence policy.

@@ -682,7 +682,7 @@ class EvolutionaryLmmOps:
         phi: Any,
         exclude_chrom: Any = None,
         *,
-        tol: float = 1e-9,
+        tol: float = 5e-4,
         max_iter: int | None = None,
         initial: np.ndarray | None = None,
         stats: dict[str, Any] | None = None,

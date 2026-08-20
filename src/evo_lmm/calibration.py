@@ -196,7 +196,7 @@ def calibrate_association(
     count: int = DEFAULT_CALIBRATION_VARIANTS,
     seed: int = 0,
     screen_threshold: float = DEFAULT_SCREEN_THRESHOLD,
-    cg_tol: float = 1e-9,
+    cg_tol: float = 5e-4,
     stats: dict[Any, TestVariantStats] | None = None,
 ) -> CalibrationResult:
     """Calibrate the LMM statistic against the fitted evolutionary covariance.

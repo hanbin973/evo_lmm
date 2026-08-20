@@ -407,8 +407,11 @@ every point listed in §2.5:
   reaches its target leaves the active set and stops being multiplied.
 - **Per-column relative target**
   $\lVert r \rVert^2 \le \max(\lVert r_0 \rVert^2, 1) \cdot$ `cg_tol`$^2$,
-  with `cg_tol = 1e-9` by default — roughly six orders of magnitude tighter
-  than GRAPP's `5e-4`.
+  with `cg_tol = 5e-4` by default, deliberately set to GRAPP's value so the
+  two solvers do comparable work per application. Earlier releases defaulted
+  to `1e-9`; that tolerance is still the right choice for a reportable
+  estimate or a dense-oracle comparison, and the equivalence tests pin it
+  explicitly.
 - **Denominator guard** on $p^{\top} H p$, and a
   `numpy.linalg.LinAlgError` **raised** if any column is still unconverged at
   the iteration cap `max(50, 4N)`. A failed solve is caught by the optimizer,
@@ -446,11 +449,11 @@ guess and records a warning. The default remains `"default"`.
 
 | Symbol | Keyword | Default | Where |
 | --- | --- | --- | --- |
-| $`S`$, trace probes | `trace_probes` | `64`, clamped to $`\ge 2`$; ignored when `exact` | `fit_reml:390` |
+| $`S`$, trace probes | `trace_probes` | `12`, clamped to $`\ge 2`$; ignored when `exact` | `fit_reml:390` |
 | trace estimator | `trace_method` | `"hutchinson"` (Rademacher); `"xtrace"` uses spherical Gaussian probes of radius $`\sqrt{N}`$ and $`2S`$ queries | `trace.py` |
 | exact traces | `exact` | `None` $`\Rightarrow`$ `True` iff every chromosome is dense | `fit_reml` |
 | probe seed | `seed` | `0`; probes drawn once per fit and reused at every $`\phi`$ | `rademacher_probes:21` |
-| CG relative tolerance | `cg_tol` | `1e-9`, per column, error on non-convergence | `solve_ph:679` |
+| CG relative tolerance | `cg_tol` | `5e-4`, per column, error on non-convergence | `solve_ph:679` |
 | CG iteration cap | — | $`\max(50, 4N)`$ | `solve_ph` |
 | warm starts | `warm_start` | `True`, with per-column revalidation and accepted/trial cache isolation | `solve_ph`, `_quantities` |
 | Newton iterations | `max_iter` | `50` accepted iterations | `fit_reml` |
@@ -476,7 +479,7 @@ guess and records a warning. The default remains `"default"`.
 | Non-convergence behaviour | warns, returns best iterate | flags `converged=False` in diagnostics; exact path retries with L-BFGS-B |
 | Likelihood value available? | never | yes on the exact path, `nan` matrix-free |
 | Uncertainty reported | delete-one jackknife of $`f`$; `CgStats` | per-coordinate trace standard errors, AI condition, damping, CG residual norms |
-| CG tolerance | `5e-4`, relative, batch-wide | `1e-9`, relative, per column |
+| CG tolerance | `5e-4`, relative, batch-wide | `5e-4`, relative, per column (same value, different stopping rule) |
 | CG failure | silent, records residual | raises, optimizer damps and retries |
 | Warm starts | none | default, with revalidation |
 | Evaluations per fit | $`\le 7`$ | $`\le`$ `max_iter` accepted, each up to 12 trials |
@@ -501,14 +504,27 @@ variance-component stage costs on the order of $7 \kappa (T+1)$ applications.
 - $p$ `apply_dh` calls on $\xi$, and $p^2$ `apply_dh` calls on the columns of
   $\zeta$ for the AI matrix.
 
-With defaults $S = 64$, $p = 2$, and `cg_tol = 1e-9` needing a substantially
-larger $\kappa'$ than GRAPP's $\kappa$, a single evo-lmm evaluation is far more
-expensive than a single GRAPP evaluation, and there can be up to 50 accepted
-iterations rather than 7 total. Warm starts recover much of the difference by
-cutting $\kappa'$ on later iterations — that is exactly what they were added
-for — but the asymmetry in the cost model, not an implementation defect, is the
-main reason the benchmark in `docs/tutorials/bolt_benchmark.rst` shows evo-lmm
-slower than GRAPP for a fit of comparable quality.
+With defaults $S = 12$, $p = 2$, and `cg_tol = 5e-4` — the same tolerance
+GRAPP uses, so $\kappa' \approx \kappa$ — a single evo-lmm evaluation costs on
+the order of $\kappa(13 + p)$ applications plus the $p + p^2$ derivative
+applications, against GRAPP's $\kappa(T+1)$. The remaining asymmetry is the
+iteration count: up to 50 accepted iterations, each with up to 12 line-search
+trials, versus GRAPP's 7 evaluations in total. Warm starts cut $\kappa'$ further
+on later iterations. This asymmetry in the cost model, not an implementation
+defect, is the main reason the benchmark in
+`docs/tutorials/bolt_benchmark.rst` shows evo-lmm slower than GRAPP for a fit
+of comparable quality.
+
+Measured effect of the current defaults on a two-chromosome GRG fit with
+$N = 200$ and about 9,200 model variants, 20 iterations, everything else held
+fixed: $(S, \texttt{cg\_tol}) = (64, 10^{-9})$ took 295 s with trace standard
+errors $(0.094, 0.111)$ for $(\log \delta, \log \tau)$; $(12, 5\times10^{-4})$
+took 34 s with $(0.228, 0.330)$. That is an $8.6\times$ speedup for a
+$2$–$3\times$ increase in trace uncertainty — consistent with the
+$\sqrt{64/12} \approx 2.3$ scaling of a Hutchinson standard error — and the
+point estimates agreed to three significant figures. Neither configuration
+converged on that case, which is a fitting-policy problem (Priority 1), not a
+consequence of the probe budget.
 
 ## 6. Practical consequences
 
@@ -536,14 +552,18 @@ should return actionable diagnostics rather than a plausible-looking estimate.
 When reproducing GRAPP numbers, that difference in failure semantics — not just
 the tolerance values — has to be accounted for.
 
-**Tuning order.** For speed, reduce $S$ before loosening `cg_tol`: the trace
-probe count multiplies the dominant CG batch width, while `cg_tol` interacts
-with warm starting and with the Newton iteration's ability to tell a real score
-from solver error. Five probes have been measured as insufficient for final
-refinement — they shifted shape estimates materially and enlarged trace
-uncertainty — which is why the planned two-stage scheme keeps a small sketch
-budget for early steps and a larger, deterministically nested refinement budget
-for anything reportable.
+**Tuning order.** The defaults are now the cheap end of the range: $S = 12$
+probes and `cg_tol = 5e-4`. For a reportable estimate, raise them — $S = 64$
+and `cg_tol = 1e-9` is the previous default pair and a reasonable target — and
+read `FitDiagnostics.trace_standard_errors` to confirm the score is resolved
+above trace noise. Going the other way, reduce $S$ before loosening `cg_tol`
+further: the probe count multiplies the dominant CG batch width, while `cg_tol`
+governs the Newton iteration's ability to tell a real score from solver error.
+Five probes have been measured as insufficient for final refinement — they
+shifted shape estimates materially and enlarged trace uncertainty — which is
+why the planned two-stage scheme keeps a small sketch budget for early steps
+and a larger, deterministically nested refinement budget for anything
+reportable.
 
 ## 7. Source map
 
