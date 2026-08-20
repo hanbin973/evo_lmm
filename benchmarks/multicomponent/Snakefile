@@ -1,0 +1,91 @@
+# Cached three-stage multicomponent benchmark:
+#   1. simulate: SLiM + tree-sequence/GRG conversion + phenotype generation
+#   2. infer:    cached component GRGs + phenotype -> one-row estimate CSV
+#   3. plot:     ten estimate CSVs -> combined CSV + summary figure
+
+REPLICATES = list(range(10))
+BASE_SEED = 917
+N_INDIVIDUALS = 2000
+SEQUENCE_LENGTH = 1_000_000
+MUTATION_RATE = 1e-7
+BURN_IN = 10 * N_INDIVIDUALS
+RESIDUAL_VARIANCE = 0.4
+SIGMA_B2 = {"lof": 2.25, "missense": 1.0, "synonymous": 0.25}
+W_S = 2.0
+CATEGORIES = ["lof", "missense", "synonymous"]
+
+
+rule all:
+    input:
+        "results/multicomponent.csv",
+        "results/multicomponent.png",
+
+
+rule simulate:
+    input:
+        script="simulate.py",
+        slim="multicomponent.slim",
+    output:
+        phenotype="data/replicate_{replicate}/phenotype.npy",
+        metadata="data/replicate_{replicate}/simulation.json",
+        trees="data/replicate_{replicate}/multicomponent.simplified.trees",
+        grgs=expand(
+            "data/replicate_{{replicate}}/{category}.grg", category=CATEGORIES
+        ),
+    params:
+        seed=lambda wildcards: BASE_SEED + int(wildcards.replicate),
+        individuals=N_INDIVIDUALS,
+        sequence_length=SEQUENCE_LENGTH,
+        mutation_rate=MUTATION_RATE,
+        burn_in=BURN_IN,
+        residual_variance=RESIDUAL_VARIANCE,
+        sigma_lof2=SIGMA_B2["lof"],
+        sigma_missense2=SIGMA_B2["missense"],
+        sigma_synonymous2=SIGMA_B2["synonymous"],
+        w_s=W_S,
+        output_directory=lambda wildcards: f"data/replicate_{wildcards.replicate}",
+    shell:
+        """
+        python {input.script} \
+            --replicate {wildcards.replicate} \
+            --seed {params.seed} \
+            --individuals {params.individuals} \
+            --sequence-length {params.sequence_length} \
+            --mutation-rate {params.mutation_rate} \
+            --burn-in {params.burn_in} \
+            --residual-variance {params.residual_variance} \
+            --sigma-lof2 {params.sigma_lof2} \
+            --sigma-missense2 {params.sigma_missense2} \
+            --sigma-synonymous2 {params.sigma_synonymous2} \
+            --w-s {params.w_s} \
+            --slim-script {input.slim} \
+            --output-directory {params.output_directory} \
+            --metadata {output.metadata}
+        """
+
+
+rule infer:
+    input:
+        script="infer.py",
+        phenotype="data/replicate_{replicate}/phenotype.npy",
+        metadata="data/replicate_{replicate}/simulation.json",
+        grgs=expand(
+            "data/replicate_{{replicate}}/{category}.grg", category=CATEGORIES
+        ),
+    output:
+        "results/raw/replicate_{replicate}.csv",
+    params:
+        data_directory=lambda wildcards: f"data/replicate_{wildcards.replicate}",
+    shell:
+        "python {input.script} --data-directory {params.data_directory} --output {output}"
+
+
+rule plot:
+    input:
+        script="plot_benchmark.py",
+        results=expand("results/raw/replicate_{replicate}.csv", replicate=REPLICATES),
+    output:
+        summary="results/multicomponent.csv",
+        figure="results/multicomponent.png",
+    shell:
+        "python {input.script} --input {input.results} --summary {output.summary} --figure {output.figure}"

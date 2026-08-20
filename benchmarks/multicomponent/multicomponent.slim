@@ -1,0 +1,48 @@
+// Annotation-partitioned forward simulation for the multicomponent benchmark.
+//
+// Each mutation type is a separate model component.  Its normally distributed
+// selected-trait effect alpha has variance SIGMA_*2.  With k_c = 1/2,
+// rho_ab,c = 1, and shared W_S, the fitted composite is tau_c = SIGMA_*2/W_S.
+
+initialize() {
+    if (!exists("N")) defineConstant("N", 2000);
+    if (!exists("L")) defineConstant("L", 1000000);
+    if (!exists("MUT_RATE")) defineConstant("MUT_RATE", 1e-7);
+    if (!exists("REC_RATE")) defineConstant("REC_RATE", 1e-8);
+    if (!exists("SIGMA_LOF2")) defineConstant("SIGMA_LOF2", 2.25);
+    if (!exists("SIGMA_MISSENSE2")) defineConstant("SIGMA_MISSENSE2", 1.0);
+    if (!exists("SIGMA_SYNONYMOUS2")) defineConstant("SIGMA_SYNONYMOUS2", 0.25);
+    if (!exists("V_S")) defineConstant("V_S", 4.0 * N);
+    if (!exists("BURN_IN")) defineConstant("BURN_IN", 10 * N);
+    if (!exists("OUTPUT_FILE")) defineConstant("OUTPUT_FILE", "multicomponent.trees");
+
+    initializeTreeSeq();
+    initializeMutationType("m2", 0.5, "n", 0.0, sqrt(SIGMA_LOF2));
+    initializeMutationType("m3", 0.5, "n", 0.0, sqrt(SIGMA_MISSENSE2));
+    initializeMutationType("m4", 0.5, "n", 0.0, sqrt(SIGMA_SYNONYMOUS2));
+    initializeGenomicElementType("g1", c(m2, m3, m4), c(1.0, 1.0, 1.0));
+    initializeGenomicElement(g1, 0, L - 1);
+    initializeMutationRate(MUT_RATE);
+    initializeRecombinationRate(REC_RATE);
+}
+
+1 early() {
+    sim.addSubpop("p1", N);
+}
+
+mutationEffect(m2) { return 1.0; }
+mutationEffect(m3) { return 1.0; }
+mutationEffect(m4) { return 1.0; }
+
+fitnessEffect() {
+    phenotype = individual.sumOfMutationsOfType(m2) +
+        individual.sumOfMutationsOfType(m3) +
+        individual.sumOfMutationsOfType(m4);
+    return exp(-phenotype^2 / (2.0 * V_S));
+}
+
+BURN_IN late() {
+    sim.treeSeqOutput(OUTPUT_FILE);
+    catn("Forward simulation complete: " + size(sim.mutations) + " mutations");
+    sim.simulationFinished();
+}
