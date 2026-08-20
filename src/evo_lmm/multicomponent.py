@@ -405,8 +405,6 @@ def _fit_multicomponent_ai(
              (f"log_sigma_b2[{label}]", f"log_tau[{label}]")]
     converged = False
     covariance = None
-    last_sigma_e2 = np.nan
-    last_prior = initial
     last_score = np.full(len(names), np.nan)
     last_step = 0.0
     damping = 0.0
@@ -468,6 +466,20 @@ def _fit_multicomponent_ai(
         correction = basis_solution @ np.linalg.solve(fixed, ops.basis.T @ target)
         result = target - correction
         return result[:, 0] if was_vector else result
+
+    # Seed the reported state from the initial point.  Two exits can leave the
+    # loop before the in-loop assignments below: ``max_iter=0``, and a
+    # line-search rejection on the first iteration.  Without this seeding both
+    # propagate a placeholder into ``SimplifiedPrior`` and raise "sigma_b2 must
+    # be finite and strictly positive" -- a validator error from the
+    # result-assembly step rather than an actionable fit diagnostic.
+    last_prior = MultiComponentPrior.from_coordinates(ops.labels, coords)
+    seed_quadratic = float(y @ projected_solve(y, last_prior))
+    if not np.isfinite(seed_quadratic) or seed_quadratic <= 0.0:
+        raise np.linalg.LinAlgError(
+            "profiled REML quadratic form is non-positive at the initial prior"
+        )
+    last_sigma_e2 = seed_quadratic / ops.dim
 
     for iteration in range(1, int(max_iter) + 1):
         prior = MultiComponentPrior.from_coordinates(ops.labels, coords)
@@ -535,7 +547,13 @@ def _fit_multicomponent_ai(
                 last_step = float(np.max(np.abs(step)) * (0.5 ** halving))
                 break
         if not accepted:
+            # The step was rejected, but this iteration's point is a valid
+            # iterate: report it rather than the previous one (or, on the first
+            # iteration, rather than the seed).
             last_step = 0.0
+            last_score = score
+            last_prior = prior
+            last_sigma_e2 = q / ops.dim
             damping = max(1e-6, damping * 10.0 if damping else 1e-6)
             if score_norm <= 10.0 * tol:
                 converged = True

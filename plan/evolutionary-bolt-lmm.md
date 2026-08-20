@@ -274,10 +274,25 @@ Blocking defects found in the same audit, ahead of any further checkboxes:
   `n=2000` with two categories it returns `converged=False`, `h2 = 0.993`
   against a truth of `0.187`, and `tau` collapsed to zero; the exact profiled
   REML objective is `1050.6` at the returned point against `108.6` at the truth.
-- `multicomponent.py:550` propagates the `np.nan` initialiser of
+- ~~`multicomponent.py:550` propagates the `np.nan` initialiser of
   `last_sigma_e2` into `SimplifiedPrior`, raising `ValueError: sigma_b2 must be
   finite and strictly positive` on any loop exit that precedes the in-loop
-  assignment (`max_iter=0` reproduces it).
+  assignment.~~ **Fixed.** The reported state is now seeded from the initial
+  point before the loop, and the line-search-rejection branch records its own
+  iterate instead of breaking past the assignments. Two exits triggered it:
+  `max_iter=0`, and a first-iteration line-search rejection — reachable simply
+  by starting the fit at the generating parameters. Covered by
+  `test_max_iter_zero_returns_seeded_diagnostics_instead_of_raising` and
+  `test_first_iteration_line_search_rejection_reports_that_iterate`, both of
+  which fail against the pre-fix source.
+
+Diagnostic lead for the convergence defect, recorded while fixing the above:
+started at the generating parameters on the `n=2000` case, the fitter reports
+`h2 = 0.178` against a realized truth of `0.187` — i.e. the truth is close to
+right — but `score_norm = 2.218` there and **every one of the ten step halvings
+is rejected**. The score and the average-information matrix therefore disagree
+about the descent direction at a point that is very nearly optimal. Suspect the
+AI construction or the 12-probe trace noise before suspecting the step logic.
 
 ## Remaining work
 

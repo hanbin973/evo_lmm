@@ -116,3 +116,62 @@ def test_multicomponent_reml_returns_scientific_component_scales():
     assert np.all(fit.prior.sigma_b2 > 0)
     assert np.all(fit.prior.tau >= 0)
     assert 0 <= fit.h2 <= 1
+
+
+def test_max_iter_zero_returns_seeded_diagnostics_instead_of_raising():
+    """A loop that never runs must still report the initial point.
+
+    Regression: the reported state was seeded with a placeholder that reached
+    ``SimplifiedPrior`` and raised "sigma_b2 must be finite and strictly
+    positive" from the result-assembly step instead of returning diagnostics.
+    """
+    ops, _, _ = _ops()
+    y = np.random.default_rng(5).normal(size=ops.n)
+    initial = MultiComponentPrior(
+        ops.labels, (SimplifiedPrior(0.9, 0.4), SimplifiedPrior(0.6, 1.1))
+    )
+    fit = fit_multicomponent_reml(ops, y, initial=initial, max_iter=0)
+    assert not fit.converged
+    assert np.isfinite(fit.sigma_e2) and fit.sigma_e2 > 0.0
+    assert np.all(fit.prior.sigma_b2 > 0.0)
+    np.testing.assert_allclose(fit.prior.tau, initial.tau)
+    np.testing.assert_allclose(
+        fit.prior.sigma_b2, fit.sigma_e2 * initial.sigma_b2, rtol=1e-12
+    )
+
+
+def _rejection_fixture():
+    n = 120
+    rng = np.random.default_rng(5)
+    genotypes, frequencies, contribution = {}, {}, np.zeros(n)
+    for label, count, scale, tau in (("lof", 15, 0.05, 60.0), ("missense", 20, 0.02, 10.0)):
+        p = rng.beta(0.4, 0.4, size=count) * 0.49 + 0.01
+        matrix = rng.binomial(2, p, size=(n, count)).astype(float)
+        freq = matrix.mean(axis=0) / 2.0
+        q = freq * (1.0 - freq)
+        contribution += matrix @ rng.normal(0.0, np.sqrt(scale / (1.0 + 2.0 * tau * q)))
+        genotypes[label] = matrix
+        frequencies[label] = freq
+    y = contribution + rng.normal(0.0, 1.0, size=n)
+    ops = MultiComponentOps.from_dense(genotypes, frequencies)
+    truth = MultiComponentPrior(
+        ops.labels, (SimplifiedPrior(0.05, 60.0), SimplifiedPrior(0.02, 10.0))
+    )
+    return ops, y, truth
+
+
+def test_first_iteration_line_search_rejection_reports_that_iterate():
+    """A rejected first step must report the current iterate, not raise.
+
+    Regression: the ``not accepted`` branch left the loop before the state
+    assignments, so a first-iteration rejection hit the same result-assembly
+    validator error as ``max_iter=0``.  This is the reachable trigger: starting
+    the fit at the generating parameters is enough.
+    """
+    ops, y, truth = _rejection_fixture()
+    fit = fit_multicomponent_reml(ops, y, initial=truth, max_iter=1, trace_probes=4, seed=1)
+    assert fit.accepted_step == 0.0, "fixture no longer exercises the rejection path"
+    assert not fit.converged
+    assert np.isfinite(fit.sigma_e2) and fit.sigma_e2 > 0.0
+    assert np.isfinite(fit.score_norm)
+    np.testing.assert_allclose(fit.prior.tau, truth.tau)
