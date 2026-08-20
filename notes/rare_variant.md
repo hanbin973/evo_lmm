@@ -369,6 +369,13 @@ remaining work is to move the REML fit itself onto the GRGL/matrix-free path,
 reuse shared solves and probes for all component derivatives, and prove the
 shared-`tau` and single-category identities against the existing fitter.
 
+MC1–MC3 supporting utilities are now present: named flat and MAC-collapse
+baselines, the RareEffect MoM-ratio rule, a joint projected MoM system, both
+heritability conventions, MAF-bin decomposition, generic delta-method and
+profile-likelihood helpers, a boundary-mixture LRT, and pooled-shape/per-gene
+report objects. These are utility-level implementations; production ML/AI
+integration, stochastic trace support, and the MC0 acceptance gate remain open.
+
 $$
 K = \sum_c \sigma_{b,c}^2 \, P_C X_c \,
 \mathrm{diag}\!\left(\frac{1}{1 + 2\tau_c q_j}\right) X_c^{\top} P_C .

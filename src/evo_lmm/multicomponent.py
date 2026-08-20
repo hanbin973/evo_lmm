@@ -44,10 +44,6 @@ class MultiComponentPrior:
         return cls(labels, tuple(SimplifiedPrior(*parameters[label]) for label in labels))
 
     @property
-    def n_components(self) -> int:
-        return len(self.components)
-
-    @property
     def sigma_b2(self) -> np.ndarray:
         return np.asarray([p.sigma_b2 for p in self.components], dtype=np.float64)
 
@@ -96,6 +92,13 @@ class MultiComponentOps:
     @property
     def n_components(self) -> int:
         return len(self.components)
+
+    def project(self, values: np.ndarray) -> np.ndarray:
+        """Project vectors or matrices off the shared covariate basis."""
+        array = np.asarray(values, dtype=np.float64)
+        if array.ndim not in (1, 2) or array.shape[0] != self.n:
+            raise ValueError("values must have n rows")
+        return array - self.basis @ (self.basis.T @ array)
 
     @classmethod
     def from_dense(

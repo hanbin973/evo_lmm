@@ -137,6 +137,27 @@ Evidence:
 - `src/evo_lmm/operators.py`
 - `tests/test_multicomponent.py`
 
+### Phase 1 supporting utilities (MC1–MC3 in progress)
+
+- [x] Named flat M0 prior and optional MAC-threshold burden collapsing with
+  frequency recomputation and source-column provenance.
+- [x] RareEffect MoM-ratio adjustment with the non-positive-MoM fallback
+  represented explicitly in the result.
+- [x] Joint projected multi-component MoM system with raw estimates and a
+  separate truncation audit.
+- [x] Both heritability conventions, per-MAF-bin genic-variance decomposition,
+  generic delta-method SEs, tau profile-likelihood evaluation, boundary-mixture
+  LRT p-values, and pooled-shape/per-gene-scale report objects.
+- [ ] Integrate marginal ML fitting, XTrace/Hutchinson trace estimates, AI-based
+  covariance/SEs, and gene-level fitting into the production multi-component
+  fitter; these are required before MC1–MC3 can be marked complete.
+
+Evidence:
+
+- `src/evo_lmm/baselines.py`
+- `src/evo_lmm/reporting.py`
+- `tests/test_phase1_components.py`
+
 ### Public fitting and prediction surface
 
 - [x] Dense and GRG-backed simplified/full fitting entry points.
