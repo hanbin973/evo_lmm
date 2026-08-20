@@ -113,8 +113,16 @@ class MultiComponentOps:
     def component_kernels(self, prior: MultiComponentPrior) -> dict[Any, np.ndarray]:
         if prior.labels != self.labels:
             raise ValueError("prior labels do not match the partition")
-        return {label: component.sigma_b2 * self.components[label].dense_kernel(component)
+        return {label: component.sigma_b2 * self._component_kernel(label, component)
                 for label, component in zip(prior.labels, prior.components)}
+
+    def _component_kernel(self, label: Any, prior: SimplifiedPrior) -> np.ndarray:
+        """Materialize one component only when an exact small fit requests it."""
+        op = self.components[label]
+        if all(chrom.dense is not None for chrom in op._chromosomes):
+            return op.dense_kernel(prior)
+        identity = np.eye(op.n, dtype=np.float64)
+        return op.apply_k_matmat(identity, prior)
 
     def dense_kernel(self, prior: MultiComponentPrior) -> np.ndarray:
         return sum(self.component_kernels(prior).values(), start=np.zeros((self.n, self.n)))
@@ -145,6 +153,11 @@ class MultiComponentOps:
         result: dict[str, np.ndarray] = {}
         for index, (label, component) in enumerate(zip(self.labels, prior.components)):
             op = self.components[label]
+            if any(chrom.dense is None for chrom in op._chromosomes):
+                identity = np.eye(op.n, dtype=np.float64)
+                result[f"log_sigma_b2[{label}]"] = component.sigma_b2 * op.apply_k_matmat(identity, component)
+                result[f"log_tau[{label}]"] = component.sigma_b2 * op.apply_dh_matmat(identity, component, "log_tau")
+                continue
             result[f"log_sigma_b2[{label}]"] = component.sigma_b2 * op.dense_kernel(component)
             derivative = component.weight_derivatives(op.frequencies)["log_tau"]
             matrices = []
@@ -183,6 +196,8 @@ class MultiComponentFit:
     objective: float
     converged: bool
     ops: MultiComponentOps
+    ai_covariance: np.ndarray | None = None
+    standard_errors: dict[str, float] | None = None
 
 
 def fit_multicomponent_reml(
@@ -210,6 +225,17 @@ def fit_multicomponent_reml(
         prior = MultiComponentPrior.from_coordinates(ops.labels, np.asarray(initial))
     if prior.labels != ops.labels:
         raise ValueError("initial prior labels do not match the partition")
+
+    # The one-category model is exactly the existing single-component model;
+    # delegate it so its scale/profile/numerical conventions remain identical.
+    if ops.n_components == 1:
+        from .reml import fit_reml
+        label = ops.labels[0]
+        single = fit_reml(ops.components[label], values, initial=prior.components[0], exact=True,
+                          max_iter=max_iter)
+        fitted = MultiComponentPrior((label,), (single.prior,))
+        return MultiComponentFit(fitted, single.sigma_e2, single.h2, single.diagnostics.objective,
+                                 single.diagnostics.converged, ops)
     coordinates = prior.coordinates.copy()
     finite = np.isfinite(coordinates)
     coordinates[~finite] = np.log(np.finfo(float).tiny)
@@ -235,4 +261,16 @@ def fit_multicomponent_reml(
     kernel = ops.dense_kernel(fitted)
     genetic = float(np.trace(kernel))
     h2 = genetic / max(genetic + ops.dim * sigma_e2, np.finfo(float).tiny)
-    return MultiComponentFit(fitted, sigma_e2, h2, objective, bool(result.success), ops)
+    covariance = None
+    standard_errors: dict[str, float] = {}
+    if hasattr(result, "hess_inv"):
+        try:
+            covariance = np.asarray(result.hess_inv.todense(), dtype=np.float64)
+            diagonal = np.sqrt(np.maximum(np.diag(covariance), 0.0))
+            for index, label in enumerate(ops.labels):
+                standard_errors[f"log_sigma_b2[{label}]"] = float(diagonal[2 * index])
+                standard_errors[f"log_tau[{label}]"] = float(diagonal[2 * index + 1])
+        except (AttributeError, ValueError):
+            covariance = None
+    return MultiComponentFit(fitted, sigma_e2, h2, objective, bool(result.success), ops,
+                             covariance, standard_errors)

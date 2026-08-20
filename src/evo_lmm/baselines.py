@@ -127,6 +127,37 @@ class RareEffectBaselineResult:
     negative_mom_fallback: np.ndarray
 
 
+def fit_rare_effect_baseline(
+    ops: MultiComponentOps, y: np.ndarray, *, max_iter: int = 100
+) -> RareEffectBaselineResult:
+    """Fit the named flat baseline marginally and apply the MoM-ratio rule.
+
+    Each category is fitted independently with the existing exact REML engine
+    at the ``tau=0`` boundary.  The joint adjustment is then computed from the
+    partitioned moment system; no evolutionary weighting is introduced.
+    """
+    from .reml import fit_reml
+
+    marginal = []
+    marginal_mom = []
+    flat = flat_prior(ops.labels)
+    for label in ops.labels:
+        fit = fit_reml(ops.components[label], y,
+                       initial=SimplifiedPrior(1.0, 0.0), exact=True,
+                       max_iter=max_iter)
+        marginal.append(fit.sigma_b2)
+        component = ops.components[label]
+        kernel = component.dense_kernel(SimplifiedPrior(1.0, 0.0))
+        projected = component.project(np.asarray(y, dtype=np.float64))
+        trace = float(np.trace(kernel))
+        system = np.array([[float(np.trace(kernel @ kernel)), trace], [trace, component.dim]])
+        rhs = np.array([projected @ kernel @ projected, projected @ projected])
+        moment = np.linalg.lstsq(system, rhs, rcond=None)[0]
+        marginal_mom.append(moment[0])
+    joint = joint_mom_initialization(ops, y, flat)
+    return rare_effect_mom_ratio(np.asarray(marginal), np.asarray(marginal_mom), joint.raw_component_scales)
+
+
 def rare_effect_mom_ratio(
     marginal_scales: np.ndarray,
     marginal_mom_scales: np.ndarray,

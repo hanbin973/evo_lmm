@@ -52,6 +52,7 @@ from .baselines import (
     collapse_mac,
     flat_prior,
     joint_mom_initialization,
+    fit_rare_effect_baseline,
     rare_effect_mom_ratio,
 )
 from .reporting import (
@@ -114,6 +115,7 @@ __all__ = [
     "collapse_mac",
     "flat_prior",
     "joint_mom_initialization",
+    "fit_rare_effect_baseline",
     "RareEffectBaselineResult",
     "rare_effect_mom_ratio",
     "HeritabilityEstimates",
