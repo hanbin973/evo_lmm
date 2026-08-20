@@ -18,6 +18,11 @@ from .grg_data import VariantData, dense_variant_data, grg_variant_data
 from .priors import EvolutionaryPrior, FullPrior, SimplifiedPrior, prior_from_coordinates, prior_from_parameters
 
 
+# GRAPP excludes columns whose projected raw-dosage norm falls below this
+# threshold; keeping the same value preserves eligibility parity.
+_MIN_PROJECTED_NORM2 = 0.1
+
+
 def _as_chromosomes(chromosomes: Any) -> list[tuple[Any, Any]]:
     if isinstance(chromosomes, np.ndarray):
         return [(0, chromosomes)]
@@ -86,6 +91,42 @@ def _orthonormal_covariates(covariates: np.ndarray | None, n: int) -> np.ndarray
         raise ValueError("covariates have no non-zero rank")
     rank = int(np.count_nonzero(diagonal > diagonal.max() * 1e-10))
     return np.ascontiguousarray(q[:, :rank], dtype=np.float64)
+
+
+@dataclass(frozen=True)
+class TestVariantStats:
+    """Per-variant tested-genotype statistics for one chromosome block.
+
+    All quantities are computed after the covariate projection ``P_C``.  The
+    ``test_scale`` is the BOLT normalisation ``sqrt(centered_norm2 / (n - 1))``
+    applied to raw diploid dosage columns, so ``norm_scale = 1 / test_scale``
+    converts a raw-dosage quantity into BOLT-normalised units.  Nothing here
+    depends on the fitted evolutionary prior.
+
+    Attributes
+    ----------
+    projected_norm2:
+        ``||P_C x_j||^2`` in raw diploid dosage units.
+    std_projected_norm2:
+        ``||P_C x_j||^2`` in BOLT-normalised units, i.e.
+        ``projected_norm2 * norm_scale**2``.
+    model_mask:
+        Variants eligible for association output; monomorphic and
+        covariate-collinear columns are excluded exactly as in GRAPP.
+    """
+
+    chrom: Any
+    local_idx: np.ndarray
+    centered_norm2: np.ndarray
+    projected_norm2: np.ndarray
+    test_scale: np.ndarray
+    norm_scale: np.ndarray
+    std_projected_norm2: np.ndarray
+    model_mask: np.ndarray
+
+    @property
+    def n_variants(self) -> int:
+        return int(self.local_idx.size)
 
 
 @dataclass
@@ -221,6 +262,9 @@ class EvolutionaryLmmOps:
                 )
             )
         self._basis = _orthonormal_covariates(covariates, self.n)
+        # The covariate basis is fixed after construction, so the projected
+        # test-column norms only need one traversal per chromosome.
+        self._projected_norms_ready = False
 
     @classmethod
     def from_dense(
@@ -351,6 +395,45 @@ class EvolutionaryLmmOps:
                     raw_norm = chrom.data.centered_norm2
                 projected[:] = np.maximum(raw_norm - np.sum(coefficients * coefficients, axis=1), 0.0)
             chrom.projected_norm2[:] = projected
+
+    def _ensure_projected_norms(self) -> None:
+        if not self._projected_norms_ready:
+            self._refresh_projected_norms()
+            self._projected_norms_ready = True
+
+    def test_stats(self, chrom: Any) -> TestVariantStats:
+        """Return prior-independent tested-genotype statistics for a chromosome.
+
+        These are the quantities the BOLT-style calibration and association
+        formulas need: the projected raw-dosage norms, the BOLT normalisation,
+        and the eligibility mask.  They depend only on the genotypes and the
+        covariate basis, never on the fitted evolutionary prior.
+        """
+
+        item = self._get_chrom(chrom)
+        self._ensure_projected_norms()
+        centered_norm2 = np.asarray(item.data.centered_norm2, dtype=np.float64)
+        projected_norm2 = np.asarray(item.projected_norm2, dtype=np.float64).copy()
+        test_scale = np.asarray(item.test_scale, dtype=np.float64).copy()
+        usable = (centered_norm2 > 0.0) & (test_scale > 0.0)
+        norm_scale = np.zeros_like(test_scale)
+        norm_scale[usable] = 1.0 / test_scale[usable]
+        std_projected_norm2 = projected_norm2 * norm_scale * norm_scale
+        model_mask = (
+            usable
+            & (projected_norm2 >= _MIN_PROJECTED_NORM2)
+            & (std_projected_norm2 > 0.0)
+        )
+        return TestVariantStats(
+            chrom=item.label,
+            local_idx=item.data.local_idx.copy(),
+            centered_norm2=centered_norm2.copy(),
+            projected_norm2=projected_norm2,
+            test_scale=test_scale,
+            norm_scale=norm_scale,
+            std_projected_norm2=std_projected_norm2,
+            model_mask=model_mask,
+        )
 
     def project(self, values: np.ndarray) -> np.ndarray:
         arr = np.asarray(values, dtype=np.float64)
@@ -723,6 +806,11 @@ class EvolutionaryLmmOps:
             return self.project(item.dense @ coefficients)
         return self.project(self._raw_matvec(item, coefficients))
 
+    def chromosome_frequencies(self, chrom: Any) -> np.ndarray:
+        """Return sample allele frequencies for one chromosome in operator order."""
+
+        return self._get_chrom(chrom).data.frequencies.copy()
+
     def local_indices(self, chrom: Any) -> np.ndarray:
         """Return mutation identifiers for a chromosome in operator order."""
 
@@ -732,7 +820,7 @@ class EvolutionaryLmmOps:
         """Return ``tr(P_C K P_C)`` without constructing a dense kernel."""
 
         prior = self._prior(theta)
-        self._refresh_projected_norms()
+        self._ensure_projected_norms()
         return float(
             sum(
                 np.dot(prior.weights(chrom.data.frequencies), chrom.projected_norm2)

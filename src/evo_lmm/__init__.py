@@ -2,6 +2,7 @@
 
 from .bolt import (
     association,
+    association_summary,
     fit_evolutionary_bolt_lmm,
     fit_evolutionary_bolt,
     fit_evolutionary_lmm,
@@ -9,8 +10,13 @@ from .bolt import (
     loco_solutions,
     predict_blup,
 )
+from .calibration import (
+    CalibrationResult,
+    calibrate_association,
+    select_calibration_variants,
+)
 from .grg_data import VariantData, dense_variant_data, grg_variant_data, sample_allele_frequencies
-from .operators import EvolutionaryLmmOps
+from .operators import EvolutionaryLmmOps, TestVariantStats
 from .priors import (
     EvolutionaryPrior,
     FullPrior,
@@ -36,6 +42,7 @@ from .simulation import GrgSimulation, simulate_grg_lmm
 
 __all__ = [
     "AssociationResult",
+    "CalibrationResult",
     "DenseREMLOracle",
     "EvolutionaryLmmOps",
     "EvolutionaryPrior",
@@ -47,6 +54,10 @@ __all__ = [
     "VariantData",
     "allele_frequency_q",
     "association",
+    "association_summary",
+    "calibrate_association",
+    "select_calibration_variants",
+    "TestVariantStats",
     "dense_variant_data",
     "exact_average_information",
     "exact_reml_score",

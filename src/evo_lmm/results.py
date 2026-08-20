@@ -90,7 +90,14 @@ class FitResult:
 
 @dataclass(frozen=True)
 class AssociationResult:
-    """Compact BOLT-compatible association output for one chromosome block."""
+    """Compact BOLT-compatible association output for one chromosome block.
+
+    ``beta`` and ``se`` are in raw diploid-dosage effect units, matching the
+    evolutionary model's ``sigma_b2`` scale.  ``score`` is the calibrated
+    inverse-variance score ``x_j^T V_loco^-1 y`` on the BOLT-normalised test
+    column.  Entries excluded by ``model_mask`` (monomorphic or
+    covariate-collinear columns) carry ``nan`` statistics and ``pvalue = 1``.
+    """
 
     chrom: Any
     local_idx: np.ndarray
@@ -99,3 +106,20 @@ class AssociationResult:
     se: np.ndarray
     chisq: np.ndarray
     pvalue: np.ndarray
+    chisq_linreg: np.ndarray | None = None
+    pvalue_linreg: np.ndarray | None = None
+    model_mask: np.ndarray | None = None
+    frequencies: np.ndarray | None = None
+    inverse_scale: float = float("nan")
+    calibration_factor: float = float("nan")
+
+    @property
+    def n_variants(self) -> int:
+        return int(self.local_idx.size)
+
+    def good(self) -> np.ndarray:
+        """Return the boolean mask of variants with reportable statistics."""
+
+        if self.model_mask is None:
+            return np.isfinite(self.chisq)
+        return np.asarray(self.model_mask, dtype=bool)

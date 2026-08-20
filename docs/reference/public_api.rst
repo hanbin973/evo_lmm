@@ -53,3 +53,28 @@ Fitting results
    :members:
    :show-inheritance:
    :noindex:
+
+Association and calibration
+---------------------------
+
+.. autoclass:: evo_lmm.CalibrationResult
+   :members:
+   :show-inheritance:
+   :noindex:
+
+.. autoclass:: evo_lmm.TestVariantStats
+   :members:
+   :show-inheritance:
+   :noindex:
+
+.. autofunction:: evo_lmm.calibrate_association
+   :noindex:
+
+.. autofunction:: evo_lmm.select_calibration_variants
+   :noindex:
+
+.. autofunction:: evo_lmm.association
+   :noindex:
+
+.. autofunction:: evo_lmm.association_summary
+   :noindex:

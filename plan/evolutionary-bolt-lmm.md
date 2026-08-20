@@ -1,6 +1,6 @@
 # Evolutionary GRGL-backed LMM: status and remaining work
 
-Last audited: 2026-08-19
+Last audited: 2026-08-20
 
 ## Purpose
 
@@ -144,29 +144,68 @@ guarantees.
 
 ## Remaining work
 
-### Priority 0: finish correctness of the BOLT-style analysis path
+### Priority 0: finish correctness of the BOLT-style analysis path (done)
 
-The variance-component fitter is implemented, but the current
-`association()` helper is not yet a faithful replacement for GRAPP's full
-calibration procedure. It uses projected test columns and conservative
-denominators; it does not perform GRAPP's prospective/retrospective calibration
-on sampled variants.
+`association()` now performs GRAPP's prospective/retrospective calibration on
+sampled variants using the fitted evolutionary LOCO covariance, with the tested
+columns kept on the independent BOLT normalisation.
 
-- [ ] Implement calibration using the fitted evolutionary LOCO covariance while
+- [x] Implement calibration using the fitted evolutionary LOCO covariance while
   retaining the independent BOLT-normalized test operator.
-- [ ] Audit beta, standard-error, chi-square, and calibration-scale formulas in
+- [x] Audit beta, standard-error, chi-square, and calibration-scale formulas in
   raw-effect units; do not reinterpret `sigma_b^2` as GRAPP's standardized
   `sigma_g^2`.
-- [ ] Add dense-versus-GRG association equivalence tests.
-- [ ] Add simplified-versus-full `rho^2 = 1` association equivalence tests.
-- [ ] Add seeded null simulations that check calibration and test-statistic
+- [x] Add dense-versus-GRG association equivalence tests.
+- [x] Add simplified-versus-full `rho^2 = 1` association equivalence tests.
+- [x] Add seeded null simulations that check calibration and test-statistic
   inflation.
-- [ ] Add tests covering missing phenotypes and nontrivial covariates through
+- [x] Add tests covering missing phenotypes and nontrivial covariates through
   fitting, LOCO, association, and BLUP.
 
-Acceptance gate: the CPU association output is calibrated on seeded null data,
-matches a dense oracle on small data, and preserves the exact nested-model
-identity.
+Implementation notes:
+
+- `EvolutionaryLmmOps.test_stats()` returns the prior-independent tested-genotype
+  quantities (projected raw and BOLT-normalized norms, `norm_scale`, and the
+  GRAPP-compatible eligibility mask). Projected norms are computed once per
+  operator, since the covariate basis is fixed after construction.
+- `evo_lmm.calibration` mirrors GRAPP's `select_bolt_calibration_snps` and
+  `calibrate_lmm_inf`: blocked uniform selection with a GRAMMAR pre-screen at
+  `retro < 5`, prospective/retrospective moments from LOCO solves, a jackknife
+  standard error, and the ratio-of-medians fallback above a standard error of
+  `0.01`. The prospective and retrospective statistics are invariant to
+  `sigma_b^2`, so the factor is a pure shape correction and `sigma_b^2` enters
+  only through the per-chromosome inverse scale.
+- `association()` returns `beta` and `se` in raw diploid-dosage units, a
+  calibrated inverse-variance `score`, a single-variant linear-regression
+  chi-square, and the eligibility mask. Ineligible columns carry `nan`
+  statistics and `pvalue = 1`. `association_summary()` reports mean chi-square
+  and `lambda_GC` for both statistics.
+- `calibrate=False` and `use_loco=False` remain available as diagnostics and are
+  documented as uncalibrated.
+
+Evidence:
+
+- `src/evo_lmm/calibration.py`
+- `src/evo_lmm/bolt.py`
+- `src/evo_lmm/operators.py`
+- `src/evo_lmm/results.py`
+- `tests/test_association.py`
+- `docs/howto/index.rst`
+
+Acceptance gate: met on CPU. The dense oracle test reproduces the residual
+solves, both calibration moments, the factor, and the reported
+`beta`/`se`/`chi-square` from an explicit pseudo-inverse; the seeded pure-null
+panels return a calibration factor within `0.15` of one and a mixed-model mean
+chi-square that matches plain regression; the `rho^2 = 1` full model reproduces
+the simplified association output exactly.
+
+Observed while validating, and now recorded as Priority 1 evidence: when a GRG
+fit is stopped at a small iteration cap and leaves `h2` near its upper boundary
+on null data, the calibrated statistic inflates (`lambda_GC` around 1.7). The
+same null data with a converged fit gives `lambda_GC` in line with plain
+regression. Calibration corrects the statistic's scale, not a variance-component
+fit that has not converged, which is why the convergence-policy work below is
+the next gate.
 
 ### Priority 1: harden fitting for routine production use
 
@@ -265,8 +304,11 @@ uv run python -c "import evo_lmm, pygrgl"
 uv run sphinx-build -W -b html docs docs/_build/html
 ```
 
-At the last audit, the regular suite had 25 passing tests and the large suite
-had 4 passing tests. Generated simulation artifacts remain ignored under
+At the last audit, `uv run pytest -q` collected 41 tests and 40 passed.
+`test_large_grg_matrix_free_fit_matches_dense_parameter_oracle` fails on
+aarch64 Linux with a stochastic-tolerance mismatch in the matrix-free versus
+dense kernel comparison. It failed before the Priority 0 work as well, and
+belongs to the Priority 1 convergence-policy item. Generated simulation artifacts remain ignored under
 `docs/_artifacts/`.
 
 ## Definition of the next milestone
@@ -274,10 +316,11 @@ had 4 passing tests. Generated simulation artifacts remain ignored under
 The next milestone is not another covariance-kernel prototype. It is a
 calibrated, end-to-end CPU analysis path in which:
 
-1. simplified and full evolutionary fits converge with clear diagnostics;
+1. simplified and full evolutionary fits converge with clear diagnostics
+   (open: Priority 1);
 2. LOCO association uses the fitted evolutionary covariance and independent
-   BOLT-normalized test columns;
-3. null calibration and dense/GRG equivalence tests pass;
-4. BLUP and association preserve the `rho^2 = 1` nested identity; and
+   BOLT-normalized test columns (done);
+3. null calibration and dense/GRG equivalence tests pass (done);
+4. BLUP and association preserve the `rho^2 = 1` nested identity (done); and
 5. the multi-replicate benchmark reports accuracy and runtime without rerunning
    forward simulations.

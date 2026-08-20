@@ -6,11 +6,21 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 import numpy as np
-from scipy.special import ndtr
+from scipy.special import erfc
 
+from .calibration import (
+    DEFAULT_CALIBRATION_VARIANTS,
+    DEFAULT_SCREEN_THRESHOLD,
+    CalibrationResult,
+    calibrate_association,
+    uncalibrated_scale,
+)
 from .operators import EvolutionaryLmmOps
 from .results import AssociationResult, FitResult
 from .reml import fit_reml
+
+# Median of a one-degree-of-freedom chi-square, used to normalise lambda_GC.
+_CHI2_1DF_MEDIAN = 0.4549364231195732
 
 
 def _filter_dense(genotypes: Any, keep: np.ndarray) -> Any:
@@ -173,45 +183,159 @@ def loco_solutions(result: FitResult, y: np.ndarray | None = None) -> dict[Any, 
     }
 
 
+def _chi2_sf_1df(values: np.ndarray) -> np.ndarray:
+    """Survival function of a one-degree-of-freedom chi-square."""
+
+    with np.errstate(invalid="ignore"):
+        return erfc(np.sqrt(np.asarray(values, dtype=np.float64) * 0.5))
+
+
 def association(
     result: FitResult,
     y: np.ndarray | None = None,
     *,
     use_loco: bool = True,
+    calibrate: bool = True,
+    calibration: CalibrationResult | None = None,
+    calibration_variants: int = DEFAULT_CALIBRATION_VARIANTS,
+    seed: int = 0,
+    screen_threshold: float = DEFAULT_SCREEN_THRESHOLD,
+    cg_tol: float = 1e-9,
 ) -> list[AssociationResult]:
-    """Compute compact score/beta/SE association results from test operators.
+    """Compute calibrated BOLT-style association statistics per chromosome.
 
-    The test columns are BOLT-normalised and remain separate from the
-    frequency-weighted model columns.  This CPU implementation intentionally
-    returns typed arrays instead of coupling the core to a DataFrame package.
+    The mixed-model statistic uses the *fitted evolutionary* LOCO covariance
+    ``V_loco = sigma_b2 * (K_evo,loco + delta I)`` while the tested columns keep
+    GRAPP's independent BOLT normalisation.  With ``calibrate=True`` the
+    prospective/retrospective moment matching of
+    :func:`evo_lmm.calibrate_association` supplies the per-chromosome inverse
+    scale; otherwise the uncalibrated (``factor = 1``) scale is used, which is
+    only appropriate for diagnostics.
+
+    ``beta`` and ``se`` are returned in raw diploid-dosage units.  A
+    single-variant linear-regression chi-square is reported alongside the mixed
+    model statistic so inflation can be compared directly.
     """
 
-    if result.ops is None:
+    ops = result.ops
+    if ops is None:
         raise ValueError("fit result is not attached to an operator")
     phenotype = result.projected_phenotype if y is None else np.asarray(y, dtype=np.float64)
-    solutions = loco_solutions(result, phenotype) if use_loco else {None: result.ph_y}
+    projected_phenotype = ops.project(phenotype)
+    phenotype_norm2 = float(projected_phenotype @ projected_phenotype)
+    if phenotype_norm2 <= 0.0:
+        raise ValueError("phenotype has nonpositive projected norm")
+    stats = {chrom: ops.test_stats(chrom) for chrom in ops.chroms}
+    dim = float(max(ops.dim, 1))
+
+    if not use_loco:
+        if calibration is not None or calibrate:
+            # Calibration is defined by leave-one-chromosome-out moments; there
+            # is no honest calibration for the in-sample statistic.
+            calibrate = False
+            calibration = None
+        residuals = {chrom: result.ph_y for chrom in ops.chroms}
+    elif calibrate:
+        if calibration is None:
+            calibration = calibrate_association(
+                result,
+                phenotype,
+                count=calibration_variants,
+                seed=seed,
+                screen_threshold=screen_threshold,
+                cg_tol=cg_tol,
+                stats=stats,
+            )
+        residuals = calibration.residuals
+        if not residuals:
+            residuals = loco_solutions(result, phenotype)
+    else:
+        residuals = loco_solutions(result, phenotype)
+
     output: list[AssociationResult] = []
-    for chrom in result.ops.chroms:
-        solution = solutions[chrom] if use_loco else solutions[None]
-        scores = result.ops.test_scores(chrom, solution)
-        # The score variance uses the test-column norm on the fitted residual
-        # subspace.  It is conservative but remains in the same tested-genotype
-        # units as GRAPP's downstream calibration interface.
-        nvar = scores.size
-        se = np.empty(nvar, dtype=np.float64)
-        beta = np.empty(nvar, dtype=np.float64)
-        local_idx = result.ops.local_indices(chrom)
-        for idx, score in enumerate(scores):
-            # test_column is projected and normalised, hence its Euclidean norm
-            # is an appropriate stable denominator for this score statistic.
-            column = result.ops.test_column(chrom, int(local_idx[idx]))
-            norm2 = max(float(column @ column), np.finfo(float).tiny)
-            se[idx] = np.sqrt((result.sigma_e2 + result.sigma_b2) / norm2)
-            beta[idx] = score / norm2
-        chisq = (beta / np.maximum(se, np.finfo(float).tiny)) ** 2
-        pvalue = 2.0 * ndtr(-np.sqrt(np.maximum(chisq, 0.0)))
-        output.append(AssociationResult(chrom, local_idx, scores, beta, se, chisq, pvalue))
+    for chrom in ops.chroms:
+        item = stats[chrom]
+        residual = residuals[chrom]
+        if calibration is not None:
+            inverse_scale = float(calibration.inverse_scale[chrom])
+            factor = float(calibration.factor)
+        else:
+            inverse_scale = uncalibrated_scale(result, float(residual @ residual))
+            factor = 1.0
+        mask = np.asarray(item.model_mask, dtype=bool)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            # ``test_scores`` are BOLT-normalised; multiplying by ``test_scale``
+            # returns to raw diploid-dosage score units before the 1/sigma_b2
+            # factor of V^-1 is applied.
+            raw_score = (
+                np.asarray(ops.test_scores(chrom, residual), dtype=np.float64)
+                * item.test_scale
+                / float(result.sigma_b2)
+            )
+            score = raw_score / inverse_scale
+            chisq = (score * score) / item.projected_norm2
+            beta = raw_score / (item.projected_norm2 * inverse_scale * inverse_scale)
+            se = 1.0 / (np.sqrt(item.projected_norm2) * inverse_scale)
+            linreg_score = np.asarray(
+                ops.test_scores(chrom, projected_phenotype), dtype=np.float64
+            )
+            chisq_linreg = (
+                linreg_score * linreg_score
+            ) / phenotype_norm2 / item.std_projected_norm2 * dim
+        pvalue = np.where(mask, _chi2_sf_1df(np.where(mask, chisq, 0.0)), 1.0)
+        pvalue_linreg = np.where(
+            mask, _chi2_sf_1df(np.where(mask, chisq_linreg, 0.0)), 1.0
+        )
+        nan = float("nan")
+        output.append(
+            AssociationResult(
+                chrom=chrom,
+                local_idx=item.local_idx,
+                score=np.where(mask, score, nan),
+                beta=np.where(mask, beta, nan),
+                se=np.where(mask, se, nan),
+                chisq=np.where(mask, chisq, nan),
+                pvalue=pvalue,
+                chisq_linreg=np.where(mask, chisq_linreg, nan),
+                pvalue_linreg=pvalue_linreg,
+                model_mask=mask,
+                frequencies=np.asarray(
+                    ops.chromosome_frequencies(chrom), dtype=np.float64
+                ),
+                inverse_scale=inverse_scale,
+                calibration_factor=factor,
+            )
+        )
     return output
+
+
+def association_summary(results: Sequence[AssociationResult]) -> dict[str, dict[str, float]]:
+    """Return mean chi-square and lambda_GC for the mixed model and linreg.
+
+    ``lambda_gc`` divides the median chi-square by the median of a
+    one-degree-of-freedom chi-square, so a calibrated null gives values near
+    one for both statistics.
+    """
+
+    summary: dict[str, dict[str, float]] = {}
+    for key, attribute in (("lmm", "chisq"), ("linreg", "chisq_linreg")):
+        values: list[np.ndarray] = []
+        for item in results:
+            array = getattr(item, attribute)
+            if array is None:
+                continue
+            array = np.asarray(array, dtype=np.float64)
+            values.append(array[item.good() & np.isfinite(array)])
+        pooled = np.concatenate(values) if values else np.empty(0, dtype=np.float64)
+        if pooled.size:
+            summary[key] = {
+                "mean": float(np.mean(pooled)),
+                "lambda_gc": float(np.median(pooled) / _CHI2_1DF_MEDIAN),
+                "n_good": int(pooled.size),
+            }
+        else:
+            summary[key] = {"mean": float("nan"), "lambda_gc": float("nan"), "n_good": 0}
+    return summary
 
 
 def predict_blup(result: FitResult) -> np.ndarray:

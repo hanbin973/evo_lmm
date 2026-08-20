@@ -10,6 +10,8 @@ dependencies = [
     "numpy>=2.0",
     "pygrgl",
     "scipy>=1.14",
+    "seaborn>=0.13.2",
+    "snakemake>=9.25.2",
     "tskit>=1.0.3",
 ]
 
