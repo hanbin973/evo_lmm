@@ -85,8 +85,9 @@ Run the simulation and fitting workflow with:
    uv run python docs/tutorials/slim_forward_simplified.py
 
 The fitted ``sigma_b2`` and ``tau`` are finite-sample estimates, not exact
-recovery targets. The short population history and one phenotype vector per
-replicate leave limited information about the frequency-shape parameter.
+recovery targets. Each replicate contains one finite genomic region and one
+phenotype vector, which leave limited information about the frequency-shape
+parameter even after the ``10N``-generation burn-in.
 Inspect ``FitDiagnostics`` before interpreting an individual fit.
 
 Summary figure
