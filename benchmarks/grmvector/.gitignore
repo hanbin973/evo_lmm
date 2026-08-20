@@ -1,0 +1,7 @@
+# Analysis outputs: regenerate with `snakemake`, never commit.
+# Cached simulation inputs (tree sequences, GRGs).
+data/
+# Timings, aggregated summary, and plots.
+results/
+# Snakemake bookkeeping.
+.snakemake/

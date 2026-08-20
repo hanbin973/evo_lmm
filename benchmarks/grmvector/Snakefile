@@ -1,0 +1,113 @@
+# GRM-vector benchmark: tskit vs grapp (raw, non-normalized GRG operator).
+#
+# Staged so that the expensive inputs are built once and reused:
+#   1. simulate       msprime  -> data/trees/ts_N{n}_mu{mu}.trees
+#   2. convert        .trees   -> data/grg/grg_N{n}_mu{mu}.grg
+#   3. run_benchmark  cached artifacts -> results/raw/bench_N{n}_mu{mu}.csv
+#   4. aggregate      -> results/benchmark_summary.csv
+#   5. plot           -> results/benchmark_plot.png
+#
+# Editing benchmark.py or plot_benchmark.py re-runs only steps 3-5; the tree
+# sequences and GRGs on disk are left alone.
+
+# --- Configuration ---
+SAMPLES = [2000, 5000, 10000, 20000]
+MUTATION_RATES = [1e-8, 1e-7, 1e-6]
+
+SEQ_LEN = 1e7
+NE = 100000
+RHO = 1e-8
+SEED = 42
+ITERATIONS = 10
+
+
+rule all:
+    input:
+        "results/benchmark_plot.png"
+
+
+# 1. Coalescent simulation, cached on disk.
+rule simulate:
+    input:
+        script="simulate.py",
+        utils="utils.py"
+    output:
+        trees="data/trees/ts_N{n}_mu{mu}.trees",
+        meta="data/trees/ts_N{n}_mu{mu}.json"
+    params:
+        seq_len=SEQ_LEN,
+        ne=NE,
+        rho=RHO,
+        seed=SEED
+    shell:
+        """
+        python {input.script} \
+            --n_samples {wildcards.n} \
+            --mu {wildcards.mu} \
+            --seq_len {params.seq_len} \
+            --ne {params.ne} \
+            --rho {params.rho} \
+            --seed {params.seed} \
+            --output {output.trees} \
+            --meta {output.meta}
+        """
+
+
+# 2. GRG construction, cached on disk.
+rule convert:
+    input:
+        script="convert.py",
+        utils="utils.py",
+        trees="data/trees/ts_N{n}_mu{mu}.trees"
+    output:
+        "data/grg/grg_N{n}_mu{mu}.grg"
+    shell:
+        "python {input.script} --trees {input.trees} --output {output}"
+
+
+# 3. Timing only; inputs are loaded, never rebuilt.
+rule run_benchmark:
+    input:
+        script="benchmark.py",
+        utils="utils.py",
+        trees="data/trees/ts_N{n}_mu{mu}.trees",
+        grg="data/grg/grg_N{n}_mu{mu}.grg"
+    output:
+        "results/raw/bench_N{n}_mu{mu}.csv"
+    params:
+        iters=ITERATIONS,
+        seed=SEED
+    shell:
+        """
+        python {input.script} \
+            --trees {input.trees} \
+            --grg {input.grg} \
+            --mu {wildcards.mu} \
+            --iterations {params.iters} \
+            --seed {params.seed} \
+            --output {output}
+        """
+
+
+# 4. Aggregate.
+rule aggregate_results:
+    input:
+        expand("results/raw/bench_N{n}_mu{mu}.csv", n=SAMPLES, mu=MUTATION_RATES)
+    output:
+        "results/benchmark_summary.csv"
+    run:
+        import pandas as pd
+        final_df = pd.concat([pd.read_csv(f) for f in input], ignore_index=True)
+        final_df.sort_values(by=["n_samples", "mu"], inplace=True)
+        final_df.to_csv(output[0], index=False)
+
+
+# 5. Plot.
+rule plot_results:
+    input:
+        csv="results/benchmark_summary.csv",
+        script="plot_benchmark.py"
+    output:
+        "results/benchmark_plot.png"
+    shell:
+        "python {input.script} --input {input.csv} --output {output}"
