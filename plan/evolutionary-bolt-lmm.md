@@ -215,9 +215,13 @@ work is comparable. On a two-chromosome `N=200` GRG fit this is `8.6x` faster
 than the previous `(64, 1e-9)` pair for a `2-3x` increase in trace standard
 error and point estimates agreeing to three significant figures. These defaults
 are for exploratory fits and benchmark parity, not for reported estimates; the
-dense-oracle and dense/GRG equivalence tests pin `cg_tol=1e-9` explicitly. The
-two-stage sketch/refinement policy below is what should eventually make the
-choice automatic rather than a documented caveat.
+dense-oracle and dense/GRG equivalence tests pin `cg_tol=1e-9` explicitly. For
+now a reportable estimate is obtained by raising the budget by hand — `(64,
+1e-9)` is the documented target pair — and reading
+`FitDiagnostics.trace_standard_errors` to confirm the score is resolved above
+trace noise. Making that choice automatic is the two-stage sketch/refinement
+item under Priority 2; it is a cost optimization, not a prerequisite for a
+correct reported estimate.
 
 The documentation benchmark intentionally caps optimization at eight
 iterations and reports secant/convergence warnings from the comparison path.
@@ -225,24 +229,6 @@ That setup is useful for timing but is not a production convergence policy.
 
 - [ ] Define and test a production convergence policy independently of the
   matched-budget benchmark.
-- [ ] Split stochastic REML into two trace-precision stages:
-  - a **sketch stage** uses a small configurable probe budget for the first
-    coarse AI-REML steps, where accurate scores are unnecessary;
-  - a **refinement stage** switches to a larger configurable probe budget
-    before convergence can be declared and uses that budget for final scores,
-    uncertainty diagnostics, and reported estimates;
-  - make the refinement probes a deterministic superset of the sketch probes
-    so the switch adds information without discarding the common random
-    numbers already used by the optimizer;
-  - define the transition using optimization state (for example, a bounded
-    step/score threshold) with a maximum sketch-iteration fallback, rather
-    than relying only on a fixed iteration number;
-  - reset or revalidate CG warm-start caches at the transition and record the
-    stage, probe counts, transition iteration, and operator-query counts in
-    diagnostics;
-  - test that final convergence and estimates are judged only at refinement
-    precision, including cases where the sketch-stage score appears to have
-    converged by chance.
 - [x] Wire `haseman_elston_initialization()` into `fit_reml()` as the optional
   `initialization="he"` mode. The default remains unchanged.
 - [ ] Add explicit tests for trace-error-driven non-convergence and any retry or
@@ -269,12 +255,34 @@ still shows evo-lmm slower than GRAPP. Profile before adding more machinery.
   line-search trials where profiling shows a material cost.
 - [ ] Re-evaluate Hutchinson probe count using end-to-end estimate error and
   convergence, not trace microbenchmarks alone.
+- [ ] Split stochastic REML into two trace-precision stages:
+  - a **sketch stage** uses a small configurable probe budget for the first
+    coarse AI-REML steps, where accurate scores are unnecessary;
+  - a **refinement stage** switches to a larger configurable probe budget
+    before convergence can be declared and uses that budget for final scores,
+    uncertainty diagnostics, and reported estimates;
+  - make the refinement probes a deterministic superset of the sketch probes
+    so the switch adds information without discarding the common random
+    numbers already used by the optimizer;
+  - define the transition using optimization state (for example, a bounded
+    step/score threshold) with a maximum sketch-iteration fallback, rather
+    than relying only on a fixed iteration number;
+  - reset or revalidate CG warm-start caches at the transition and record the
+    stage, probe counts, transition iteration, and operator-query counts in
+    diagnostics;
+  - test that final convergence and estimates are judged only at refinement
+    precision, including cases where the sketch-stage score appears to have
+    converged by chance.
+  Lowered from Priority 1: the hand-raised `(64, 1e-9)` budget already
+  yields correct reported estimates, so this item buys cost, not correctness.
 - [ ] Consider a changing-kernel Nyström preconditioner only if CG again becomes
   the dominant measured cost. Include sketch construction and refresh time in
   the comparison.
 
 Acceptance gate: report end-to-end time, estimate changes, convergence status,
-and operator-equivalent work over multiple persisted replicates.
+and operator-equivalent work over multiple persisted replicates. For the
+two-stage item specifically, the gate is that estimates and convergence match a
+single-stage fit run entirely at the refinement budget, at lower total cost.
 
 ### Priority 3: GPU and user-facing interfaces
 

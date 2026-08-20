@@ -422,8 +422,12 @@ plan records a non-converged fit near the $h^2$ boundary producing
 $\lambda_{GC} \approx 1.7$ on null data. M2 has six shape coordinates, several
 of them weakly identified by construction (§2.2) — a strictly harder
 optimization problem than the two-parameter fits that policy was written for.
-Do not begin Phase 3 before the two-stage sketch/refinement policy exists and is
-tested at $|c| = 3$.
+Do not begin Phase 3 before that convergence policy exists and is tested at
+$|c| = 3$. It does **not** depend on the two-stage sketch/refinement scheme,
+which is a Priority 2 cost optimization: reportable multi-component fits are
+obtained by raising the probe budget by hand to the documented `(64, 1e-9)` pair
+and confirming `FitDiagnostics.trace_standard_errors` resolves the score above
+trace noise.
 
 ---
 
@@ -527,7 +531,7 @@ compliance review first.
 
 **Gate:** the reproduced baseline agrees with published estimates within their
 reported intervals, and every reported evolutionary fit is converged at
-refinement-stage trace precision.
+the reportable trace budget.
 
 ---
 
