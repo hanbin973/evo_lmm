@@ -409,8 +409,8 @@ Work items:
   `reml.py` does not generalize as written; state which scale is profiled and
   keep the objective's ML/REML status declared.
 - [x] Batched derivative-kernel application per component; shared block-CG
-  reuse is now used inside the production fitter. The existing
-  solve and shared Hutchinson probes (`operators.apply_dh_matmat`).
+  reuse is now used inside the production fitter through
+  `operators.apply_dh_matmat`-compatible batched paths.
 - [x] PSD and symmetry tests per component and for the sum.
 - [ ] Exact nesting tests up the ladder: all $\tau_c = 0$ reproduces M0
   bit-for-bit; $\tau_c \equiv \tau$ reproduces M1; a single category reproduces
@@ -447,11 +447,13 @@ coordinates in a weakly identified regime.
 - [x] Per-MAF-bin genic-variance decomposition
   $\sum_{j \in \text{bin}} \sigma_{b,c}^2 w_j \lVert P_C X_j \rVert^2$ — the
   primary quantity for H2.
-- [x] Standard errors for $h^2$, $\sigma_{b,c}^2$, $\tau_c$ by delta method from
-  the AI matrix; **profile likelihoods for $\tau_c$**, since a symmetric
+- [ ] Complete standard errors for $h^2$, $\sigma_{b,c}^2$, $\tau_c$ by delta
+  method from the AI matrix; the current fit exposes approximate covariance and
+  h² uncertainty, while full scientific-scale parameter integration remains.
+  **Profile likelihoods for $\tau_c$** remain required because a symmetric
   delta-method interval is not credible in a weakly identified coordinate.
 - [x] Boundary-aware LRT for the ladder (mixture null; not a naive $\chi^2$).
-- [ ] Gene-level output: pooled $\tau_c$ with per-gene $\sigma_{b,c}^2$
+- [x] Gene-level output: pooled $\tau_c$ with per-gene $\sigma_{b,c}^2$
   (empirical-Bayes two-level), matching RareEffect's reporting unit.
 
 ### MC4 — WES data path
@@ -524,8 +526,8 @@ $\to$ MC3 reporting. MC4 runs in parallel, needed only for Phase 3.
 boundary; dense-versus-GRG equivalence at the single-component default
 `cg_tol=5e-4`; the reproduced
 RareEffect estimator matches a from-scratch reimplementation on a small dense
-case. Kernel-level and utility-level pieces are present, but the production
-AI-REML, dense/GRGL fit-equivalence, and independent baseline-reproduction
+case. Production AI-REML, block-CG, XTrace, and reporting utilities are now
+present; the fit-level boundary ladder and independent baseline-reproduction
 checks remain open.
 
 ### Phase 2 — Calibrated simulation (primary evidence)

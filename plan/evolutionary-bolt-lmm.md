@@ -156,8 +156,10 @@ Evidence:
 - [x] Added marginal baseline fitting, Hutchinson-compatible joint trace
   estimation, fit-level Hessian covariance where available, and pooled
   gene-level reporting objects.
-- [x] Integrate AI covariance/SEs into the h²/parameter reporting layer and
-  add pooled-shape/per-gene fitting/reporting helpers.
+- [x] Integrate AI covariance into h² reporting and add pooled-shape/per-gene
+  fitting/reporting helpers.
+- [ ] Complete scientific-scale delta-method SEs/profile intervals for every
+  reported `sigma_b2_c` and `tau_c`.
 - [ ] Reproduce the complete RareEffect baseline independently, including its
   marginal ML conventions, on a small dense case.
 
@@ -240,9 +242,16 @@ Order: MC0, then MC1, then MC2, then MC3. MC4 is independent and deferred.
 Acceptance gate: every nesting identity must hold exactly; dense-versus-GRG
 equivalence must hold at the single-component default `cg_tol=5e-4`; and the
 reproduced RareEffect baseline must match an independent reimplementation on a
-small dense case. The current implementation has kernel-level tests and
-utility-level baseline coverage, but these production acceptance tests remain
-open.
+small dense case. The current implementation has kernel-level tests, fit-level
+single-category parity, and utility-level baseline coverage; the fit-level
+boundary ladder and independent baseline reproduction remain open.
+
+Current open gates:
+
+- fit-level all-tau-zero/shared-tau boundary ladder;
+- independent end-to-end RareEffect baseline reproduction;
+- scientific-scale parameter intervals and the Priority 2 convergence-policy
+  tests.
 
 ## Remaining work
 
