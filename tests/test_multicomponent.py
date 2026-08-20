@@ -6,6 +6,7 @@ from evo_lmm import (
     SimplifiedPrior,
     fit_multicomponent_reml,
 )
+from evo_lmm.reml import fit_reml
 
 
 def _ops():
@@ -69,6 +70,16 @@ def test_shared_tau_and_batched_component_derivatives_are_exact():
         if name.startswith("log_tau"):
             expected = ops.derivative_kernels(prior)[name] @ values
         np.testing.assert_allclose(derivative, expected, atol=1e-10)
+
+
+def test_single_category_fit_delegates_to_existing_fitter():
+    ops, genotypes, frequencies = _ops()
+    single_ops = MultiComponentOps.from_dense({"lof": genotypes["lof"]}, {"lof": frequencies["lof"]})
+    y = np.random.default_rng(33).normal(size=single_ops.n)
+    multi = fit_multicomponent_reml(single_ops, y, initial=MultiComponentPrior.flat(("lof",)), max_iter=8)
+    reference = fit_reml(single_ops.components["lof"], y, initial=SimplifiedPrior(1.0, 0.0), exact=True, max_iter=8)
+    np.testing.assert_allclose(multi.sigma_e2, reference.sigma_e2, rtol=1e-10, atol=1e-12)
+    np.testing.assert_allclose(multi.h2, reference.h2, rtol=1e-10, atol=1e-12)
 
 
 def test_multicomponent_reml_returns_scientific_component_scales():

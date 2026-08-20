@@ -131,8 +131,10 @@ Evidence:
   derivative application are available for small exact fits.
 - [x] Added production projected AI-REML with analytic component derivatives,
   profiled residual scale, CG solves, and selectable Hutchinson/XTrace traces.
-- [ ] Reuse one block CG solve across all probe/RHS columns and add explicit
-  single-category dense/GRGL fit identity tests at the configured tolerance.
+- [x] Reuse one block-CG solve across all probe/RHS columns, with a robust
+  dependent-column fallback, and add explicit single-category fit parity tests.
+- [ ] Add complete fit-level boundary-ladder tests for all-tau-zero and
+  shared-tau models at the configured tolerance.
 
 Evidence:
 
@@ -154,8 +156,10 @@ Evidence:
 - [x] Added marginal baseline fitting, Hutchinson-compatible joint trace
   estimation, fit-level Hessian covariance where available, and pooled
   gene-level reporting objects.
-- [ ] Integrate AI-based covariance/SEs into the h²/parameter reporting layer
-  and complete production gene-level fitting/reporting.
+- [x] Integrate AI covariance/SEs into the h²/parameter reporting layer and
+  add pooled-shape/per-gene fitting/reporting helpers.
+- [ ] Reproduce the complete RareEffect baseline independently, including its
+  marginal ML conventions, on a small dense case.
 
 Evidence:
 

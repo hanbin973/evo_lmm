@@ -359,8 +359,8 @@ annotation category, category-specific kernels and derivatives, batched
 matrix-free application, and a dense profiled-REML prototype. The GRGL-backed
 multi-component component application and a dense profiled-REML prototype are
 implemented for exact small-data fits; a production projected AI-REML path now
-supports CG solves and Hutchinson/XTrace traces. Block-CG reuse and the final
-fit-level acceptance checks remain open.
+supports CG solves and Hutchinson/XTrace traces. Block-CG reuse is now in place;
+the final fit-level acceptance checks remain open.
 
 ### MC0 — Annotation-partitioned multi-component kernel (simplified prior only)
 
@@ -369,9 +369,9 @@ category partitions through `MultiComponentOps` and `MultiComponentPrior`;
 `tau_c = 0` is tested as the exact flat-prior boundary and all component and
 summed kernels are tested for symmetry and positive semidefiniteness. GRGL
 component application, batched derivatives, and shared-`tau`/single-category
-nesting are covered at the kernel level in the current backend. The remaining work is the
-shared CG/probe reuse inside fitting, and explicit
-single-category fit equivalence at the configured tolerance.
+nesting are covered at the kernel level in the current backend. The remaining
+work is explicit fit-level all-tau-zero/shared-tau boundary checks at the
+configured tolerance and independent baseline reproduction.
 
 MC1–MC3 supporting utilities are now present: named flat and MAC-collapse
 baselines, the RareEffect MoM-ratio rule, a joint projected MoM system, both
@@ -379,8 +379,8 @@ heritability conventions, MAF-bin decomposition, generic delta-method and
 profile-likelihood helpers, a boundary-mixture LRT, and pooled-shape/per-gene
 report objects. Joint MoM accepts exact and Hutchinson-compatible trace
 settings, and the fit result exposes approximate Hessian-based covariance and
-standard errors. Production integration of AI covariance into the h²/parameter
-reporting layer and gene-level fitting remains open.
+standard errors. AI covariance is now integrated into h² reporting and pooled
+shape/per-gene fitting helpers; independent baseline reproduction remains open.
 
 $$
 K = \sum_c \sigma_{b,c}^2 \, P_C X_c \,
@@ -408,8 +408,8 @@ Work items:
   the remaining $2|c|$ shape coordinates. The single-scale profiling in
   `reml.py` does not generalize as written; state which scale is profiled and
   keep the objective's ML/REML status declared.
-- [x] Batched derivative-kernel application per component; shared CG/probe
-  reuse inside the production fitter remains open. The existing
+- [x] Batched derivative-kernel application per component; shared block-CG
+  reuse is now used inside the production fitter. The existing
   solve and shared Hutchinson probes (`operators.apply_dh_matmat`).
 - [x] PSD and symmetry tests per component and for the sum.
 - [ ] Exact nesting tests up the ladder: all $\tau_c = 0$ reproduces M0
@@ -447,7 +447,7 @@ coordinates in a weakly identified regime.
 - [x] Per-MAF-bin genic-variance decomposition
   $\sum_{j \in \text{bin}} \sigma_{b,c}^2 w_j \lVert P_C X_j \rVert^2$ — the
   primary quantity for H2.
-- [ ] Standard errors for $h^2$, $\sigma_{b,c}^2$, $\tau_c$ by delta method from
+- [x] Standard errors for $h^2$, $\sigma_{b,c}^2$, $\tau_c$ by delta method from
   the AI matrix; **profile likelihoods for $\tau_c$**, since a symmetric
   delta-method interval is not credible in a weakly identified coordinate.
 - [x] Boundary-aware LRT for the ladder (mixture null; not a naive $\chi^2$).

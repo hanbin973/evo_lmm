@@ -58,12 +58,15 @@ from .baselines import (
 from .reporting import (
     HeritabilityEstimates,
     GeneComponentReport,
+    FitReport,
     ProfileLikelihood,
     boundary_lrt_pvalue,
     delta_method_se,
     genic_variance_by_maf,
     heritability_conventions,
     gene_component_report,
+    fit_genes,
+    fit_report,
     profile_tau,
 )
 
@@ -120,11 +123,14 @@ __all__ = [
     "rare_effect_mom_ratio",
     "HeritabilityEstimates",
     "GeneComponentReport",
+    "FitReport",
     "ProfileLikelihood",
     "boundary_lrt_pvalue",
     "delta_method_se",
     "genic_variance_by_maf",
     "heritability_conventions",
     "gene_component_report",
+    "fit_genes",
+    "fit_report",
     "profile_tau",
 ]

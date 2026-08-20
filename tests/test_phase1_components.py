@@ -10,6 +10,9 @@ from evo_lmm import (
     heritability_conventions,
     joint_mom_initialization,
     fit_multicomponent_reml,
+    fit_genes,
+    fit_report,
+    rare_effect_mom_ratio,
 )
 
 
@@ -50,6 +53,27 @@ def test_production_ai_reml_supports_hutchinson_and_xtrace():
         assert np.isfinite(fit.objective)
         assert fit.ai_covariance is not None
         assert fit.standard_errors is not None
+        report = fit_report(fit, maf_bins=[0.0, 0.1, 0.5])
+        assert report.maf_decomposition is not None
+        assert np.isfinite(report.heritability_se)
+
+
+def test_gene_reporting_pools_tau_and_fits_category_scales():
+    _, _, ops, prior = _fixture()
+    reports = fit_genes({"gene1": ops}, np.random.default_rng(12).normal(size=ops.n),
+                        {label: component.tau for label, component in zip(prior.labels, prior.components)},
+                        max_iter=1, trace_probes=4)
+    assert reports["gene1"].gene == "gene1"
+    assert set(reports["gene1"].pooled_tau) == set(ops.labels)
+
+
+def test_rare_effect_ratio_matches_independent_dense_formula_and_fallback():
+    marginal = np.array([2.0, 3.0])
+    marginal_mom = np.array([1.0, -1.0])
+    joint_mom = np.array([1.5, 2.0])
+    result = rare_effect_mom_ratio(marginal, marginal_mom, joint_mom)
+    np.testing.assert_allclose(result.adjusted_scales, [3.0, 3.0])
+    np.testing.assert_array_equal(result.negative_mom_fallback, [False, True])
 
 
 def test_reporting_adapters_return_both_conventions_and_maf_bins():

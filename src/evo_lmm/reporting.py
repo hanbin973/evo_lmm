@@ -9,7 +9,8 @@ from typing import Any, Callable, Sequence
 import numpy as np
 from scipy.stats import chi2
 
-from .multicomponent import MultiComponentOps, MultiComponentPrior
+from .multicomponent import MultiComponentFit, MultiComponentOps, MultiComponentPrior, fit_multicomponent_reml
+from .priors import SimplifiedPrior
 
 
 @dataclass(frozen=True)
@@ -39,6 +40,16 @@ class GeneComponentReport:
     sigma_b2_by_category: dict[Any, float]
 
 
+@dataclass(frozen=True)
+class FitReport:
+    """Integrated estimand report with covariance-derived uncertainty."""
+
+    heritability: HeritabilityEstimates
+    heritability_se: float
+    component_standard_errors: dict[str, float]
+    maf_decomposition: dict[Any, np.ndarray] | None
+
+
 def profile_tau(
     tau_values: Sequence[float], objective: Callable[[float], float], *, confidence: float = 0.95
 ) -> ProfileLikelihood:
@@ -61,6 +72,58 @@ def gene_component_report(
     if set(pooled_tau) != set(sigma_b2_by_category):
         raise ValueError("pooled tau and per-gene scales must cover the same categories")
     return GeneComponentReport(gene, dict(pooled_tau), dict(sigma_b2_by_category))
+
+
+def fit_report(
+    fit: MultiComponentFit, *, maf_bins: Sequence[float] | None = None
+) -> FitReport:
+    """Convert a fit into both estimands plus delta-method h² uncertainty."""
+    estimates = heritability_conventions(fit.ops, fit.prior, fit.sigma_e2)
+    covariance = fit.ai_covariance
+    if covariance is None:
+        h2_se = float("nan")
+    else:
+        coordinates = fit.prior.coordinates
+
+        def h2_at(value: np.ndarray) -> float:
+            prior = MultiComponentPrior.from_coordinates(fit.ops.labels, value)
+            return heritability_conventions(fit.ops, prior, fit.sigma_e2).evolutionary
+
+        h2_se = delta_method_se(h2_at, coordinates, covariance)
+    decomposition = None if maf_bins is None else genic_variance_by_maf(
+        fit.ops, fit.prior, maf_bins
+    )
+    return FitReport(estimates, h2_se, fit.standard_errors or {}, decomposition)
+
+
+def fit_genes(
+    genes: dict[Any, MultiComponentOps],
+    phenotype: np.ndarray,
+    pooled_tau: dict[Any, float],
+    *,
+    max_iter: int = 100,
+    trace_method: str = "hutchinson",
+    trace_probes: int = 12,
+) -> dict[Any, GeneComponentReport]:
+    """Fit per-gene scales with category shapes pooled across genes."""
+    reports: dict[Any, GeneComponentReport] = {}
+    for gene, ops in genes.items():
+        if set(pooled_tau) != set(ops.labels):
+            raise ValueError("pooled_tau categories must match every gene partition")
+        initial = MultiComponentPrior(
+            ops.labels,
+            tuple(SimplifiedPrior(1.0, pooled_tau[label])
+                  for label in ops.labels),
+        )
+        fit = fit_multicomponent_reml(
+            ops, phenotype, initial=initial, max_iter=max_iter,
+            trace_method=trace_method, trace_probes=trace_probes,
+        )
+        reports[gene] = gene_component_report(
+            gene, {label: pooled_tau[label] for label in ops.labels},
+            {label: component.sigma_b2 for label, component in zip(fit.prior.labels, fit.prior.components)},
+        )
+    return reports
 
 
 def heritability_conventions(

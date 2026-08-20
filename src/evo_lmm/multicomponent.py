@@ -251,6 +251,11 @@ class MultiComponentFit:
     ops: MultiComponentOps
     ai_covariance: np.ndarray | None = None
     standard_errors: dict[str, float] | None = None
+    trace_method: str = "hutchinson"
+    trace_probes: int = 0
+    cg_tol: float = float("nan")
+    score_norm: float = float("nan")
+    trace_standard_error: float = float("nan")
 
 
 def fit_multicomponent_reml(
@@ -305,7 +310,9 @@ def fit_multicomponent_reml(
                           max_iter=max_iter)
         fitted = MultiComponentPrior((label,), (single.prior,))
         return MultiComponentFit(fitted, single.sigma_e2, single.h2, single.diagnostics.objective,
-                                 single.diagnostics.converged, ops)
+                                 single.diagnostics.converged, ops,
+                                 trace_method=trace_method, trace_probes=trace_probes,
+                                 cg_tol=cg_tol, score_norm=single.diagnostics.score_norm)
     coordinates = prior.coordinates.copy()
     finite = np.isfinite(coordinates)
     coordinates[~finite] = np.log(np.finfo(float).tiny)
@@ -343,7 +350,7 @@ def fit_multicomponent_reml(
         except (AttributeError, ValueError):
             covariance = None
     return MultiComponentFit(fitted, sigma_e2, h2, objective, bool(result.success), ops,
-                             covariance, standard_errors)
+                             covariance, standard_errors, trace_method, trace_probes, cg_tol)
 
 
 def _fit_multicomponent_ai(
@@ -391,13 +398,37 @@ def _fit_multicomponent_ai(
             matvec=lambda vector: ops.apply_shape_matmat(vector[:, None], prior)[:, 0],
             dtype=np.float64,
         )
-        solutions = np.empty_like(combined_rhs)
-        for column in range(combined_rhs.shape[1]):
-            solution, info = cg(operator, combined_rhs[:, column], rtol=cg_tol, atol=0.0,
-                                 maxiter=max(50, 4 * ops.n))
-            if info != 0:
-                raise np.linalg.LinAlgError(f"multi-component CG failed with info={info}")
-            solutions[:, column] = solution
+        def block_cg(rhs_block: np.ndarray) -> np.ndarray:
+            x = np.zeros_like(rhs_block)
+            residual = rhs_block.copy()
+            direction = residual.copy()
+            scale = np.maximum(np.sum(residual * residual, axis=0), 1e-30)
+            for _ in range(max(50, 4 * ops.n)):
+                applied = np.column_stack([
+                    operator.matvec(direction[:, column])
+                    for column in range(direction.shape[1])
+                ])
+                gram = direction.T @ applied
+                rr = residual.T @ residual
+                alpha = np.linalg.lstsq(gram, rr, rcond=None)[0]
+                x += direction @ alpha
+                residual -= applied @ alpha
+                if np.all(np.sum(residual * residual, axis=0) <= scale * cg_tol ** 2):
+                    return x
+                new_rr = residual.T @ residual
+                beta = np.linalg.lstsq(rr, new_rr, rcond=None)[0]
+                direction = residual + direction @ beta
+            # Dependent probe columns can make block Gram systems rank-deficient;
+            # retain a strict fallback for those rare cases.
+            for column in range(rhs_block.shape[1]):
+                solution, info = cg(operator, rhs_block[:, column], rtol=cg_tol, atol=0.0,
+                                     maxiter=max(50, 4 * ops.n))
+                if info != 0:
+                    raise np.linalg.LinAlgError(f"multi-component CG failed with info={info}")
+                x[:, column] = solution
+            return x
+
+        solutions = block_cg(combined_rhs)
         basis_solution = solutions[:, :ops.rank]
         fixed = ops.basis.T @ basis_solution
         target = solutions[:, ops.rank:]
@@ -476,5 +507,8 @@ def _fit_multicomponent_ai(
     # The AI path does not evaluate a stochastic log-determinant objective;
     # expose a finite score diagnostic in the common ``objective`` slot.
     objective = float(0.5 * np.dot(last_score, last_score))
-    return MultiComponentFit(fitted, last_sigma_e2, h2, objective, converged, ops,
-                             covariance, errors)
+    return MultiComponentFit(
+        fitted, last_sigma_e2, h2, objective, converged, ops, covariance, errors,
+        trace_method, trace_probes, cg_tol,
+        float(np.linalg.norm(last_score, ord=np.inf)),
+    )
