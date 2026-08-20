@@ -31,6 +31,12 @@ full:       v_j = sigma_b^2 *
               (1 - rho^2 * (2 * tau * q_j) / (1 + 2 * tau * q_j)).
 ```
 
+The annotation-partitioned extension adds one component per annotation
+category, with a category-specific `tau_c`, a shared `W_S`, and `rho_ab` fixed
+at 1. Its invariants are recorded in `AGENTS.md`; its rationale is
+`notes/rare_variant.md` section 2. The full model is frozen: implemented and
+tested at the boundaries, but no new work targets it.
+
 The following choices are not open implementation questions:
 
 - The simplified model is the exact `rho^2 = 1` specialization of the full
@@ -142,7 +148,49 @@ mean fit times of `27.06 +/- 6.77 s` for evo-lmm and `11.74 +/- 1.77 s` for
 GRAPP on this machine. These are profiling results, not portable performance
 guarantees.
 
+## Active workstream: annotation-partitioned multi-component kernel
+
+This is the current development target and it takes precedence over the
+`Priority N` backlog below, which covers the existing single-component fitter.
+Items are labelled `MC0`-`MC4`; `MC0` is not `Priority 0`.
+
+Detailed specification for every item is `notes/rare_variant.md` section 5 —
+that file says what each item means, this ledger says whether it is done.
+Binding model invariants are in `AGENTS.md`, "Annotation-partitioned
+multi-component model". Simplified prior only; the full model is frozen.
+
+- [ ] **MC0 — partitioned multi-component kernel.** Per-category prior objects
+  with analytic derivatives in `(log sigma_b_c^2, log tau_c)`; multi-component
+  AI-REML profiling one scale and searching the remaining `2|c|` shape
+  coordinates; batched per-component derivative traversals reusing the shared CG
+  solve and probes; PSD and symmetry tests per component and for the sum; exact
+  nesting tests (all `tau_c = 0`, shared `tau`, single category).
+- [ ] **MC1 — named baselines.** The flat per-category prior; RareEffect's
+  marginal ML plus MoM-ratio adjustment including its negative-MoM truncation
+  rule, reproduced faithfully; an optional MAC-threshold collapsing operator.
+- [ ] **MC2 — joint multi-component MoM / Haseman-Elston.** Generalize
+  `haseman_elston_initialization()` to the `(|c|+1)`-dimensional moment system.
+  Initialization matters more here than in the single-component case: six shape
+  coordinates, several weakly identified by construction.
+- [ ] **MC3 — estimand adapters and reporting.** Both heritability conventions;
+  per-MAF-bin genic-variance decomposition; delta-method standard errors plus
+  profile likelihoods for each `tau_c`; boundary-aware likelihood-ratio tests;
+  gene-level output with pooled shape parameters.
+- [ ] **MC4 — WES data path.** Exome pVCF/BGEN to GRG conversion; annotation
+  masks as first-class variant partitions; MAC/MAF filters applied before
+  frequency recomputation; measured GRG compression on exome rare variants.
+  Needed only for the access-gated Phase 3, so it is the lowest priority here.
+
+Order: MC0, then MC1, then MC2, then MC3. MC4 is independent and deferred.
+
+Acceptance gate: every nesting identity above holds exactly; dense-versus-GRG
+equivalence holds at `cg_tol=1e-9`; the reproduced RareEffect baseline matches
+an independent reimplementation on a small dense case.
+
 ## Remaining work
+
+The sections below are the backlog for the existing single-component fitter.
+They are not the active workstream.
 
 ### Priority 0: finish correctness of the BOLT-style analysis path (done)
 

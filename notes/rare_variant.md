@@ -24,6 +24,11 @@ Scope for this plan:
   documented for when access exists and is not scheduled work. Nothing in
   Phases 0–2 depends on it.
 
+**Reading order for an implementer.** Sections 1-4 are rationale and can be
+skimmed; §2 is the part that constrains the code and should be read closely.
+§5 is the work items. §6 is the phasing. §10 lists what is deliberately out of
+scope — check it before adding anything not asked for.
+
 Two outputs are in scope: a companion manuscript, and shipped `evo-lmm`
 capability (annotation-partitioned evolutionary kernels, joint multi-component
 REML/MoM) with tests and documentation.
@@ -218,7 +223,7 @@ Two things follow, and they bind harder here than in the paper's own setting:
    Attempting to estimate $\rho_{ab,c}^2$ separately per category would multiply
    a degeneracy that is already marginal, three times over. Use
    `SimplifiedPrior` per category, fix $\rho_{ab} = 1$, and read $\hat{\tau}_c$
-   as the composite of §2.1. This is a scope *reduction* in P0: no
+   as the composite of §2.1. This is a scope *reduction* in MC0: no
    $\mathrm{logit}\,\rho^2$ coordinates, no $\rho$-boundary handling in the
    multi-component code, and no simulation arm or metric whose purpose is to
    characterize the unsimplified model.
@@ -339,11 +344,18 @@ like-for-like comparison requires reproducing it.
 
 ## 5. Required extensions to evo-lmm
 
+These are the work items **MC0-MC4**. They are tracked as checkboxes in
+`plan/evolutionary-bolt-lmm.md` under "Active workstream"; the detail below is
+the single source of truth for *what* each item means, the ledger is the source
+of truth for *whether it is done*. Note the naming: `MC` items are this
+extension, and are unrelated to the `Priority N` sections of that ledger, which
+cover the existing single-component fitter.
+
 Current state (audited 2026-08-20): the fitter estimates **one** global
 $(\sigma_b^2, \tau, \rho^2)$ with chromosomes summed into a single kernel
 (`operators.py`, `reml.py`, `bolt.py`). Everything below is new work.
 
-### P0 — Annotation-partitioned multi-component kernel (simplified prior only)
+### MC0 — Annotation-partitioned multi-component kernel (simplified prior only)
 
 $$
 K = \sum_c \sigma_{b,c}^2 \, P_C X_c \,
@@ -378,7 +390,7 @@ Work items:
   bit-for-bit; $\tau_c \equiv \tau$ reproduces M1; a single category reproduces
   the existing single-component fit bit-for-bit.
 
-### P1 — Named baselines
+### MC1 — Named baselines
 
 - [ ] `flat` prior ($w_j \equiv 1$) as an explicitly named code path (M0).
 - [ ] Marginal-per-category ML + MoM-ratio adjustment **with** the negative-MoM
@@ -387,7 +399,7 @@ Work items:
 - [ ] Optional MAC-threshold collapsing operator (burden column construction)
   so H4 is a toggle.
 
-### P2 — Joint multi-component MoM / Haseman–Elston
+### MC2 — Joint multi-component MoM / Haseman–Elston
 
 `haseman_elston_initialization()` already solves the one-component moment
 system. Generalize to the $|c|$-component system — structurally the same object
@@ -401,7 +413,7 @@ coordinates in a weakly identified regime.
 - [ ] Report the estimate without truncation, and report separately how often
   truncation would have fired.
 
-### P3 — Estimand adapters and reporting
+### MC3 — Estimand adapters and reporting
 
 - [ ] Emit $h^2$ under **both** conventions: RareEffect's ($n$, uncentered
   $\mathrm{tr}(G\Sigma G^{\top})$) and evo-lmm's ($d$, covariate-projected).
@@ -416,7 +428,7 @@ coordinates in a weakly identified regime.
 - [ ] Gene-level output: pooled $\tau_c$ with per-gene $\sigma_{b,c}^2$
   (empirical-Bayes two-level), matching RareEffect's reporting unit.
 
-### P4 — WES data path
+### MC4 — WES data path
 
 - [ ] pVCF/BGEN $\to$ GRG conversion for exome data, per-chromosome blocks.
 - [ ] Annotation masks (LOFTEE high-confidence LoF, missense, synonymous) as
@@ -455,7 +467,7 @@ prerequisite reactivates, unchanged, if access is ever granted.
 
 ### Phase 0 — Estimand alignment and analytic bias (no data, no new code)
 
-Phase 0 does **not** gate P0. The partitioned derivation of §2.1 is settled and
+Phase 0 does **not** gate MC0. The partitioned derivation of §2.1 is settled and
 the shared-$W_S$ assumption is taken as standard, so code work in Phase 1 can
 start in parallel with everything below.
 
@@ -477,10 +489,10 @@ start in parallel with everything below.
 
 **Gate:** a written projected direction and magnitude for the bias exists.
 
-### Phase 1 — Code extensions (P0–P3)
+### Phase 1 — Code extensions (MC0–MC3)
 
-Order: P0 kernel and multi-component REML $\to$ P1 baselines $\to$ P2 joint MoM
-$\to$ P3 reporting. P4 runs in parallel, needed only for Phase 3.
+Order: MC0 kernel and multi-component REML $\to$ MC1 baselines $\to$ MC2 joint MoM
+$\to$ MC3 reporting. MC4 runs in parallel, needed only for Phase 3.
 
 **Gate:** every rung of the ladder reproduces the rung below it exactly at the
 boundary; dense-versus-GRG equivalence at `cg_tol=1e-9`; the reproduced
@@ -610,7 +622,7 @@ the reportable trace budget.
    support (Phase 0 item 5).
 3. Record the §5 model invariants in `AGENTS.md` and open the `plan/` Priority
    section for the multi-component kernel.
-4. Begin P0 — the multi-component simplified prior and its analytic
+4. Begin MC0 — the multi-component simplified prior and its analytic
    derivatives. This is no longer gated on Phase 0 and can run concurrently.
 5. Decide separately whether to pursue UKB access at all. It is the only
    long-lead item and nothing in Phases 0–2 waits on it, so it is a strategic
