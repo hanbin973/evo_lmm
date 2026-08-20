@@ -116,6 +116,27 @@ Evidence:
 - `tests/test_trace.py`
 - `tests/test_parameter_estimation_large.py`
 
+### Annotation-partitioned kernel (MC0 in progress)
+
+- [x] Added `MultiComponentPrior` with one `SimplifiedPrior` per annotation
+  category and transformed `(log_sigma_b2_c, log_tau_c)` coordinates.
+- [x] Added `MultiComponentOps` with category-specific projected kernels,
+  analytic component derivatives, PSD/symmetry coverage, and batched
+  matrix-free kernel/derivative application.
+- [x] Added an exact dense profiled-REML prototype that profiles the residual
+  scale and reports category-specific `sigma_b2_c`, `tau_c`, and heritability.
+- [x] Added deterministic tests for component PSD, derivative agreement, the
+  `tau_c = 0` flat-kernel boundary, and a seeded multi-component fit.
+- [ ] Complete the MC0 acceptance gate: GRGL-backed multi-component fitting,
+  shared-CG/probe derivative reuse in the fitter, and exact shared-`tau` and
+  single-category nesting identities against the existing fitter.
+
+Evidence:
+
+- `src/evo_lmm/multicomponent.py`
+- `src/evo_lmm/operators.py`
+- `tests/test_multicomponent.py`
+
 ### Public fitting and prediction surface
 
 - [x] Dense and GRG-backed simplified/full fitting entry points.

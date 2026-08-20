@@ -351,11 +351,23 @@ of truth for *whether it is done*. Note the naming: `MC` items are this
 extension, and are unrelated to the `Priority N` sections of that ledger, which
 cover the existing single-component fitter.
 
-Current state (audited 2026-08-20): the fitter estimates **one** global
-$(\sigma_b^2, \tau, \rho^2)$ with chromosomes summed into a single kernel
-(`operators.py`, `reml.py`, `bolt.py`). Everything below is new work.
+Current state (audited 2026-08-20): the existing fitter still estimates **one**
+global $(\sigma_b^2, \tau, \rho^2)$ with chromosomes summed into a single
+kernel (`operators.py`, `reml.py`, `bolt.py`). An MC0 implementation slice now
+also exists in `multicomponent.py`: it provides one `SimplifiedPrior` per
+annotation category, category-specific kernels and derivatives, batched
+matrix-free application, and a dense profiled-REML prototype. The GRGL-backed
+multi-component fitting path and the full nesting acceptance gate remain open.
 
 ### MC0 — Annotation-partitioned multi-component kernel (simplified prior only)
+
+Implementation status: in progress. The current code supports explicit
+category partitions through `MultiComponentOps` and `MultiComponentPrior`;
+`tau_c = 0` is tested as the exact flat-prior boundary and all component and
+summed kernels are tested for symmetry and positive semidefiniteness. The
+remaining work is to move the REML fit itself onto the GRGL/matrix-free path,
+reuse shared solves and probes for all component derivatives, and prove the
+shared-`tau` and single-category identities against the existing fitter.
 
 $$
 K = \sum_c \sigma_{b,c}^2 \, P_C X_c \,

@@ -39,6 +39,12 @@ from .reml import (
 )
 from .results import AssociationResult, FitDiagnostics, FitResult
 from .simulation import GrgSimulation, simulate_grg_lmm
+from .multicomponent import (
+    MultiComponentFit,
+    MultiComponentOps,
+    MultiComponentPrior,
+    fit_multicomponent_reml,
+)
 
 __all__ = [
     "AssociationResult",
@@ -79,4 +85,8 @@ __all__ = [
     "restricted_log_likelihood",
     "sample_allele_frequencies",
     "simulate_grg_lmm",
+    "MultiComponentFit",
+    "MultiComponentOps",
+    "MultiComponentPrior",
+    "fit_multicomponent_reml",
 ]

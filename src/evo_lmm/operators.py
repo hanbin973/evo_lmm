@@ -676,6 +676,23 @@ class EvolutionaryLmmOps:
             result += self._raw_matmat(chrom, scores * derivative[:, None])
         return self.project(result)
 
+    def apply_k_matmat(
+        self, values: np.ndarray, theta: Any, exclude_chrom: Any = None
+    ) -> np.ndarray:
+        """Apply ``K`` to batched right-hand sides without per-column traversals."""
+        matrix = np.asarray(values, dtype=np.float64)
+        if matrix.ndim != 2 or matrix.shape[0] != self.n:
+            raise ValueError("values must have shape (n, k)")
+        prior = self._prior(theta)
+        projected = self.project(matrix)
+        result = np.zeros_like(projected)
+        for chrom in self._chromosomes:
+            if chrom.label == exclude_chrom:
+                continue
+            scores = self._raw_rmatmat(chrom, projected)
+            result += self._raw_matmat(chrom, scores * prior.weights(chrom.data.frequencies)[:, None])
+        return self.project(result)
+
     def solve_ph(
         self,
         rhs_columns: np.ndarray,
