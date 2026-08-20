@@ -20,10 +20,23 @@ Scope for this plan:
   future work on identifiability grounds the paper itself establishes (§2.2).
   No work item anywhere in this plan — model, code, simulation, or reporting —
   targets the unsimplified model; everything concerning it is collected in §10.
+- **Phases 0 through 2 only.** There is no UK Biobank access, so Phase 3 is
+  documented for when access exists and is not scheduled work. Nothing in
+  Phases 0–2 depends on it.
 
 Two outputs are in scope: a companion manuscript, and shipped `evo-lmm`
 capability (annotation-partitioned evolutionary kernels, joint multi-component
 REML/MoM) with tests and documentation.
+
+**What the manuscript can claim without Phase 3.** Not a re-estimate of
+RareEffect's published heritabilities — that requires their data. What Phases
+0–2 support is stronger than it sounds and is the actual contribution: an exact
+statement of the nesting (§1.3), a closed-form projection of the flat-prior bias
+evaluated on a realistic WES allele-frequency spectrum (Phase 0), and a
+simulation study that **attributes** the bias to RareEffect's individual design
+choices — residualization, collapsing, flat prior, MoM-ratio truncation — rather
+than reporting an aggregate difference. Frame the published numbers as the
+target the projection speaks to, not as numbers this work replaces.
 
 ---
 
@@ -430,9 +443,11 @@ two-stage sketch/refinement split, which is a pure cost optimization:
 reportable multi-component fits are obtained by raising the probe budget by hand
 to the documented `(64, 1e-9)` pair and confirming
 `FitDiagnostics.trace_standard_errors` resolves the score above trace noise.
-**Accept the consequence explicitly: Phase 3 is gated on a Priority 2 item, so
-either the convergence work is pulled forward when Phase 3 approaches, or
-Phase 3 waits.**
+**This gate is currently moot: Phase 3 is not reachable without UKB access, so
+the Priority 2 convergence policy blocks no active work.** Phase 2 is simulation
+and its fits are not reported estimates of anything real, so it runs on the
+hand-raised `(64, 1e-9)` budget with per-fit diagnostics recorded. The
+prerequisite reactivates, unchanged, if access is ever granted.
 
 ---
 
@@ -512,11 +527,17 @@ truncation rule fires and its effect.
 replicates, with converged fits (`FitDiagnostics.converged`, `score_norm`,
 `trace_standard_errors` reported for every fit, per `notes/model_fitting.md` §6).
 
-### Phase 3 — UKB WES reanalysis (access-gated)
+### Phase 3 — UKB WES reanalysis (not reachable; no access)
+
+**Not current work.** There is no approved UK Biobank application, so this
+section records what the analysis would be rather than what is scheduled.
+Execution stops at the end of Phase 2. It is kept here because Phase 2's arm
+definitions and reporting surface are designed to be reusable unchanged if
+access is ever granted — dropping the section would lose that constraint.
 
 **Prerequisite:** an approved UK Biobank application with WES (fields
-23158/23159) and RAP/DNAnexus compute. Until that exists, Phase 3 is a plan.
-UKB use is governed by its access agreement; internal clinical cohorts are
+23158/23159) and RAP/DNAnexus compute. UKB use is governed by its access
+agreement; internal clinical cohorts are
 **not** a substitute — no patient-level or identifiable data enters this
 analysis, and any proposal to use internal sequencing data must go through
 compliance review first.
@@ -591,8 +612,9 @@ the reportable trace budget.
    section for the multi-component kernel.
 4. Begin P0 — the multi-component simplified prior and its analytic
    derivatives. This is no longer gated on Phase 0 and can run concurrently.
-5. Start UKB access in parallel — the long-lead item, gating Phase 3
-   independently of all code work.
+5. Decide separately whether to pursue UKB access at all. It is the only
+   long-lead item and nothing in Phases 0–2 waits on it, so it is a strategic
+   choice rather than a next action.
 
 ---
 
