@@ -155,24 +155,27 @@ This is the current development target and it takes precedence over the
 Items are labelled `MC0`-`MC4`; `MC0` is not `Priority 0`.
 
 Detailed specification for every item is `notes/rare_variant.md` section 5 —
-that file says what each item means, this ledger says whether it is done.
+that file says what each item means, this ledger says whether it is done. Item
+names here match that file's section headings verbatim; keep them in sync when
+either side is edited.
 Binding model invariants are in `AGENTS.md`, "Annotation-partitioned
 multi-component model". Simplified prior only; the full model is frozen.
 
-- [ ] **MC0 — partitioned multi-component kernel.** Per-category prior objects
+- [ ] **MC0 — Annotation-partitioned multi-component kernel (simplified prior
+  only).** Per-category prior objects
   with analytic derivatives in `(log sigma_b_c^2, log tau_c)`; multi-component
   AI-REML profiling one scale and searching the remaining `2|c|` shape
   coordinates; batched per-component derivative traversals reusing the shared CG
   solve and probes; PSD and symmetry tests per component and for the sum; exact
   nesting tests (all `tau_c = 0`, shared `tau`, single category).
-- [ ] **MC1 — named baselines.** The flat per-category prior; RareEffect's
+- [ ] **MC1 — Named baselines.** The flat per-category prior; RareEffect's
   marginal ML plus MoM-ratio adjustment including its negative-MoM truncation
   rule, reproduced faithfully; an optional MAC-threshold collapsing operator.
-- [ ] **MC2 — joint multi-component MoM / Haseman-Elston.** Generalize
+- [ ] **MC2 — Joint multi-component MoM / Haseman–Elston.** Generalize
   `haseman_elston_initialization()` to the `(|c|+1)`-dimensional moment system.
   Initialization matters more here than in the single-component case: six shape
   coordinates, several weakly identified by construction.
-- [ ] **MC3 — estimand adapters and reporting.** Both heritability conventions;
+- [ ] **MC3 — Estimand adapters and reporting.** Both heritability conventions;
   per-MAF-bin genic-variance decomposition; delta-method standard errors plus
   profile likelihoods for each `tau_c`; boundary-aware likelihood-ratio tests;
   gene-level output with pooled shape parameters.
