@@ -16,8 +16,10 @@ Scope for this plan:
 
 - **Quantitative traits only.** Binary traits, Firth correction, and the
   working-residual construction are deferred (§10).
-- **Simplified prior only ($\rho_{ab} = 1$).** The full prior is deferred, on
-  identifiability grounds the paper itself establishes (§2.2, §10).
+- **Simplified prior only ($\rho_{ab} = 1$).** The full prior is deferred to
+  future work on identifiability grounds the paper itself establishes (§2.2).
+  No work item anywhere in this plan — model, code, simulation, or reporting —
+  targets the unsimplified model; everything concerning it is collected in §10.
 
 Two outputs are in scope: a companion manuscript, and shipped `evo-lmm`
 capability (annotation-partitioned evolutionary kernels, joint multi-component
@@ -199,12 +201,14 @@ The paper states the identifiability problem directly:
 
 Two things follow, and they bind harder here than in the paper's own setting:
 
-1. **The full prior is out of scope.** Attempting to estimate
-   $\rho_{ab,c}^2$ separately per category would multiply a degeneracy that is
-   already marginal, three times over. Use `SimplifiedPrior` per category, fix
-   $\rho_{ab} = 1$, and read $\hat{\tau}_c$ as the composite of §2.1. This is a
-   scope *reduction* in P0: no $\mathrm{logit}\,\rho^2$ coordinates, no
-   $\rho$-boundary handling in the multi-component code.
+1. **The full prior is future work, not a later phase of this one.**
+   Attempting to estimate $\rho_{ab,c}^2$ separately per category would multiply
+   a degeneracy that is already marginal, three times over. Use
+   `SimplifiedPrior` per category, fix $\rho_{ab} = 1$, and read $\hat{\tau}_c$
+   as the composite of §2.1. This is a scope *reduction* in P0: no
+   $\mathrm{logit}\,\rho^2$ coordinates, no $\rho$-boundary handling in the
+   multi-component code, and no simulation arm or metric whose purpose is to
+   characterize the unsimplified model.
 2. **A rare-only window is the worst case for this degeneracy.** The paper's
    argument is that $q$ is small and weakly variable across the *whole*
    spectrum. Restricted to MAF $\le 1\%$ it is smaller and less variable still,
@@ -230,11 +234,12 @@ general model. Coordinates are counted after profiling one scale.
 | **M0** | $`\tau_c = 0`$, per-class scale | 3 | RareEffect's prior, exactly |
 | **M1** | shared $`\tau`$, per-class scale | 4 | parsimonious, **mechanistically wrong** (requires $`\rho_c^2\sigma_{a,c}^2/k_c`$ equal across classes); an identifiability crutch, labeled as such |
 | **M2** | per-class $`\tau_c`$, per-class scale | 6 | the correct partitioned model of §2.1 |
-| **M3** | per-class $`\tau_c`$ and $`\rho_{ab,c}^2`$ | 9 | **deferred** (§2.2, §10) |
 
 M0 vs M1 is the RareEffect test. M1 vs M2 is the scientifically interesting
-test: does the composite differ by annotation class? Report both, and report
-M1 honestly as a crutch rather than a model.
+test: does the composite differ by annotation class? Report both, and report M1
+honestly as a crutch rather than a model. **The ladder terminates at M2.**
+Estimating $\rho_{ab,c}^2$ per category is future work (§10), not a further rung
+to be climbed if M2 fits well.
 
 ---
 
@@ -465,12 +470,11 @@ Reuse existing assets: `docs/tutorials/slim_simplified_prior.slim`,
 `docs/_artifacts/forward_replicates/`.
 
 **Design.** Forward SLiM simulation with stabilizing selection and pleiotropy,
-structured as an exome: gene-sized loci, three annotation classes with distinct
-true $(\rho_{ab,c}^2, \sigma_{a,c}^2, k_c)$ — chosen so the classes differ in
-the *composite* $\tau_c$ while including at least one configuration where two
-classes share a composite but differ in its factors, to demonstrate directly
-that the factors are not recoverable. Synonymous class: $\rho_{ab}^2 = 0$
-exactly. Mutation rates chosen so per-gene variant counts match UKB WES. Sample
+structured as an exome: gene-sized loci, three annotation classes whose
+generative $(\rho_{ab,c}^2, \sigma_{a,c}^2, k_c)$ are chosen so the classes
+differ in the *composite* $\tau_c$. Only the composite is a target of
+estimation; its factors are generative inputs, not quantities the simulation
+sets out to recover. Synonymous class: $\rho_{ab}^2 = 0$ exactly. Mutation rates chosen so per-gene variant counts match UKB WES. Sample
 sizes $n \in \{20\text{k}, 50\text{k}\}$ plus one scaled run to check
 $n$-dependence of the collapsing bias. A faster msprime arm with a
 gnomAD-matched AFS serves as a cheap replicate generator.
@@ -491,10 +495,7 @@ attribution, not the aggregate difference, is the contribution. D vs E isolates
 the value of category-specific $\tau_c$.
 
 **Metrics.** Bias and RMSE of total $h^2$; bias of per-MAF-bin genic variance
-(H2); recovery of $\sigma_{b,c}^2$ and $\tau_c$ (H3, H5); **explicit
-demonstration that $(\rho_{ab,c}^2, \sigma_{a,c}^2, k_c)$ are individually
-unrecoverable while the composite is recovered** (the empirical basis for
-deferring M3); per-variant BLUP accuracy; held-out PRS $R^2$; CI coverage,
+(H2); recovery of $\sigma_{b,c}^2$ and $\tau_c$ (H3, H5); per-variant BLUP accuracy; held-out PRS $R^2$; CI coverage,
 including profile-likelihood intervals for $\tau_c$ (H6); rate at which the MoM
 truncation rule fires and its effect.
 
@@ -595,7 +596,11 @@ refinement-stage trace precision.
   information on $\sigma_{a,c}^2$ or $k_c$ (mutation-accumulation experiments,
   DFE estimates from independent data), or a design with real leverage across
   the frequency spectrum — most plausibly WGS rather than WES, where common
-  variants with large, variable $q$ enter the same partitioned fit.
+  variants with large, variable $q$ enter the same partitioned fit. The
+  simulation work that would demonstrate the non-identifiability empirically —
+  configurations where two classes share a composite $\tau_c$ but differ in its
+  factors — belongs to that future effort, not to Phase 2; the paper's
+  Discussion is sufficient warrant for the deferral.
 - **Separating $k_c$ (DFE shape) from $\rho_{ab,c}^2$ and $\sigma_{a,c}^2$**
   within $\hat{\tau}_c$. Same obstruction; needs an external anchor.
 - **Revisiting the shared-$W_S$ assumption.** Low priority. $V_g \ll V_S$ is
