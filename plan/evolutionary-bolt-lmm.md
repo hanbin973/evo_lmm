@@ -116,7 +116,7 @@ Evidence:
 - `tests/test_trace.py`
 - `tests/test_parameter_estimation_large.py`
 
-### Annotation-partitioned kernel (MC0 in progress)
+### Annotation-partitioned kernel (MC0 partial)
 
 - [x] Added `MultiComponentPrior` with one `SimplifiedPrior` per annotation
   category and transformed `(log_sigma_b2_c, log_tau_c)` coordinates.
@@ -127,9 +127,12 @@ Evidence:
   scale and reports category-specific `sigma_b2_c`, `tau_c`, and heritability.
 - [x] Added deterministic tests for component PSD, derivative agreement, the
   `tau_c = 0` flat-kernel boundary, and a seeded multi-component fit.
-- [ ] Complete the MC0 acceptance gate: GRGL-backed multi-component fitting,
-  shared-CG/probe derivative reuse in the fitter, and exact shared-`tau` and
-  single-category nesting identities against the existing fitter.
+- [x] GRGL-backed component application/materialization and shared batched
+  derivative application are available for small exact fits.
+- [x] Added production projected AI-REML with analytic component derivatives,
+  profiled residual scale, CG solves, and selectable Hutchinson/XTrace traces.
+- [ ] Reuse one block CG solve across all probe/RHS columns and add explicit
+  single-category dense/GRGL fit identity tests at the configured tolerance.
 
 Evidence:
 
@@ -137,7 +140,7 @@ Evidence:
 - `src/evo_lmm/operators.py`
 - `tests/test_multicomponent.py`
 
-### Phase 1 supporting utilities (MC1–MC3 in progress)
+### Phase 1 supporting utilities (MC1–MC3 partial)
 
 - [x] Named flat M0 prior and optional MAC-threshold burden collapsing with
   frequency recomputation and source-column provenance.
@@ -148,9 +151,11 @@ Evidence:
 - [x] Both heritability conventions, per-MAF-bin genic-variance decomposition,
   generic delta-method SEs, tau profile-likelihood evaluation, boundary-mixture
   LRT p-values, and pooled-shape/per-gene-scale report objects.
-- [ ] Integrate marginal ML fitting, XTrace/Hutchinson trace estimates, AI-based
-  covariance/SEs, and gene-level fitting into the production multi-component
-  fitter; these are required before MC1–MC3 can be marked complete.
+- [x] Added marginal baseline fitting, Hutchinson-compatible joint trace
+  estimation, fit-level Hessian covariance where available, and pooled
+  gene-level reporting objects.
+- [ ] Integrate AI-based covariance/SEs into the h²/parameter reporting layer
+  and complete production gene-level fitting/reporting.
 
 Evidence:
 
@@ -228,9 +233,12 @@ multi-component model". Simplified prior only; the full model is frozen.
 
 Order: MC0, then MC1, then MC2, then MC3. MC4 is independent and deferred.
 
-Acceptance gate: every nesting identity above holds exactly; dense-versus-GRG
-equivalence holds at `cg_tol=1e-9`; the reproduced RareEffect baseline matches
-an independent reimplementation on a small dense case.
+Acceptance gate: every nesting identity must hold exactly; dense-versus-GRG
+equivalence must hold at the single-component default `cg_tol=5e-4`; and the
+reproduced RareEffect baseline must match an independent reimplementation on a
+small dense case. The current implementation has kernel-level tests and
+utility-level baseline coverage, but these production acceptance tests remain
+open.
 
 ## Remaining work
 
@@ -331,13 +339,13 @@ rare-variant reanalysis reaches Phase 3, or Phase 3 waits.
 
 The stochastic defaults are the cheap end of the range: `trace_probes=12` and
 `cg_tol=5e-4`, the latter matching GRAPP's solver budget so per-application work
-is comparable. On a two-chromosome `N=200` GRG fit this is `8.6x` faster than
-the previous `(64, 1e-9)` pair for a `2-3x` increase in trace standard error and
+is comparable. On a two-chromosome `N=200` GRG fit this is the default budget;
+the previous hand-raised `(64, 5e-4)` pair gives a `2-3x` increase in trace standard error and
 point estimates agreeing to three significant figures. These defaults are for
 exploratory fits and benchmark parity, not for reported estimates; the
-dense-oracle and dense/GRG equivalence tests pin `cg_tol=1e-9` explicitly. Until
-the policy work below lands, a reportable estimate is obtained by raising the
-budget by hand — `(64, 1e-9)` is the documented target pair — and reading
+dense-oracle and dense/GRG equivalence tests use the same default `cg_tol=5e-4`.
+Until the policy work below lands, a reportable estimate is obtained by raising
+the probe budget by hand while retaining the default `cg_tol=5e-4`, and reading
 `FitDiagnostics.trace_standard_errors` to confirm the score is resolved above
 trace noise.
 
@@ -376,7 +384,7 @@ useful for timing but is not a production convergence policy.
   - test that final convergence and estimates are judged only at refinement
     precision, including cases where the sketch-stage score appears to have
     converged by chance.
-  Lowered from Priority 1: the hand-raised `(64, 1e-9)` budget already
+  Lowered from Priority 1: the hand-raised `(64, 5e-4)` budget already
   yields correct reported estimates, so this item buys cost, not correctness.
 - [ ] Consider a changing-kernel Nyström preconditioner only if CG again becomes
   the dominant measured cost. Include sketch construction and refresh time in

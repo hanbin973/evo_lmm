@@ -15,6 +15,7 @@ import numpy as np
 
 from .multicomponent import MultiComponentOps, MultiComponentPrior
 from .priors import SimplifiedPrior
+from .trace import spherical_gaussian_probes, xtrace
 
 
 def flat_prior(labels: tuple[Any, ...], scales: Mapping[Any, float] | None = None) -> MultiComponentPrior:
@@ -80,12 +81,17 @@ class MoMResult:
     raw_component_scales: np.ndarray
     truncated: np.ndarray
     system: np.ndarray
+    trace_standard_errors: dict[str, float] | None = None
 
 
 def joint_mom_initialization(
     ops: MultiComponentOps,
     y: np.ndarray,
     prior: MultiComponentPrior,
+    *,
+    trace_method: str = "exact",
+    trace_probes: int = 12,
+    seed: int = 0,
 ) -> MoMResult:
     """Solve the ``(|c|+1)`` projected Haseman--Elston moment system.
 
@@ -93,15 +99,57 @@ def joint_mom_initialization(
     ``component_scales`` field applies the RareEffect boundary rule for an
     explicitly requested baseline comparison.
     """
+    if trace_method not in ("exact", "hutchinson", "xtrace"):
+        raise ValueError("trace_method must be 'exact', 'hutchinson', or 'xtrace'")
+    if trace_probes <= 0:
+        raise ValueError("trace_probes must be positive")
+    # Small exact component kernels are the reference implementation.  The
+    # operator-level batching makes this same system available to GRGL inputs;
+    # stochastic trace replacement is intentionally kept deterministic here.
     values = np.asarray(y, dtype=np.float64)
     if values.shape != (ops.n,) or not np.all(np.isfinite(values)):
         raise ValueError("y must be a finite vector with shape (n,)")
     kernels = ops.component_kernels(prior)
     labels = prior.labels
     projected = ops.project(values)
-    traces = np.asarray([np.trace(kernel) for kernel in kernels.values()])
+    kernel_values = list(kernels.values())
+    if trace_method == "exact":
+        traces = np.asarray([np.trace(kernel) for kernel in kernel_values])
+        cross = np.asarray([[np.trace(left @ right) for right in kernel_values]
+                            for left in kernel_values])
+        trace_errors: dict[str, float] = {}
+    elif trace_method == "xtrace":
+        probes = spherical_gaussian_probes(ops.n, int(trace_probes), seed)
+        cross = np.empty((len(kernel_values), len(kernel_values)), dtype=np.float64)
+        errors = []
+        for i, left in enumerate(kernel_values):
+            traces_i = xtrace(lambda values, left=left: left @ values, probes)
+            if i == 0:
+                trace_errors = {"trace": traces_i.standard_error}
+            for j, right in enumerate(kernel_values):
+                estimate = xtrace(lambda values, left=left, right=right: left @ (right @ values), probes)
+                cross[i, j] = estimate.value
+                errors.append(estimate.standard_error)
+        traces = np.asarray([xtrace(lambda values, kernel=kernel: kernel @ values, probes).value
+                             for kernel in kernel_values])
+        trace_errors["cross"] = float(max(errors, default=0.0))
+    else:
+        rng = np.random.default_rng(int(seed))
+        probes = rng.choice(np.array([-1.0, 1.0]), size=(ops.n, int(trace_probes)))
+        products = np.empty((len(kernel_values), len(kernel_values), probes.shape[1]))
+        for i, left in enumerate(kernel_values):
+            for j, right in enumerate(kernel_values):
+                products[i, j] = np.sum(probes * (left @ (right @ probes)), axis=0)
+        cross = np.mean(products, axis=2)
+        traces = np.asarray([np.mean(np.sum(probes * (kernel @ probes), axis=0))
+                             for kernel in kernel_values])
+        trace_errors = {
+            "trace": float(np.max(np.std(
+                np.asarray([np.sum(probes * (kernel @ probes), axis=0) for kernel in kernel_values]),
+                axis=1, ddof=1) / np.sqrt(probes.shape[1]))) if probes.shape[1] > 1 else 0.0
+        }
     matrix = np.empty((len(labels) + 1, len(labels) + 1), dtype=np.float64)
-    matrix[:-1, :-1] = [[np.trace(left @ right) for right in kernels.values()] for left in kernels.values()]
+    matrix[:-1, :-1] = cross
     matrix[:-1, -1] = traces
     matrix[-1, :-1] = traces
     matrix[-1, -1] = ops.dim
@@ -113,7 +161,7 @@ def joint_mom_initialization(
     truncated = raw[:-1] < 0.0
     scales = np.maximum(raw[:-1], 0.0)
     residual = max(float(raw[-1]), np.finfo(float).tiny)
-    return MoMResult(scales, residual, raw[:-1].copy(), truncated, matrix)
+    return MoMResult(scales, residual, raw[:-1].copy(), truncated, matrix, trace_errors)
 
 
 @dataclass(frozen=True)

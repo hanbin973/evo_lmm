@@ -71,8 +71,12 @@ def heritability_conventions(
     for label, component in zip(prior.labels, prior.components):
         op = ops.components[label]
         for chrom in op._chromosomes:
-            raw_trace += component.sigma_b2 * float(np.sum(
-                (chrom.dense * chrom.dense) * component.weights(chrom.data.frequencies)[None, :]
+            raw_norm2 = chrom.data.raw_norm2
+            if raw_norm2 is None:
+                identity = np.eye(op.n, dtype=np.float64)
+                raw_norm2 = np.sum(op._raw_matmat(chrom, identity) ** 2, axis=0)
+            raw_trace += component.sigma_b2 * float(np.dot(
+                np.asarray(raw_norm2), component.weights(chrom.data.frequencies)
             ))
     evolutionary = ops.kernel_trace(prior)
     n = float(ops.n)
@@ -100,8 +104,8 @@ def genic_variance_by_maf(
         values = np.zeros(edges.size - 1, dtype=np.float64)
         for chrom in op._chromosomes:
             maf = np.minimum(chrom.data.frequencies, 1.0 - chrom.data.frequencies)
-            centered = op.project(chrom.dense)
-            contribution = component.sigma_b2 * component.weights(chrom.data.frequencies) * np.sum(centered * centered, axis=0)
+            op._ensure_projected_norms()
+            contribution = component.sigma_b2 * component.weights(chrom.data.frequencies) * chrom.projected_norm2
             bucket = np.searchsorted(edges, maf, side="right") - 1
             for index, value in zip(bucket, contribution):
                 if 0 <= index < values.size:

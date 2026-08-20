@@ -9,6 +9,7 @@ from evo_lmm import (
     genic_variance_by_maf,
     heritability_conventions,
     joint_mom_initialization,
+    fit_multicomponent_reml,
 )
 
 
@@ -36,6 +37,19 @@ def test_joint_mom_reports_raw_and_truncated_estimates():
     assert result.system.shape == (3, 3)
     assert result.raw_component_scales.shape == (2,)
     np.testing.assert_array_equal(result.truncated, result.raw_component_scales < 0)
+    xtrace_result = joint_mom_initialization(ops, np.random.default_rng(2).normal(size=ops.n), prior,
+                                             trace_method="xtrace", trace_probes=4, seed=4)
+    assert xtrace_result.trace_standard_errors is not None
+
+
+def test_production_ai_reml_supports_hutchinson_and_xtrace():
+    _, _, ops, _ = _fixture()
+    y = np.random.default_rng(9).normal(size=ops.n)
+    for trace_method in ("hutchinson", "xtrace"):
+        fit = fit_multicomponent_reml(ops, y, max_iter=2, trace_method=trace_method, trace_probes=4)
+        assert np.isfinite(fit.objective)
+        assert fit.ai_covariance is not None
+        assert fit.standard_errors is not None
 
 
 def test_reporting_adapters_return_both_conventions_and_maf_bins():

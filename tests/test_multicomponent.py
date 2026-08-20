@@ -50,6 +50,27 @@ def test_zero_tau_is_exact_flat_per_category_nesting():
     np.testing.assert_array_equal(ops.dense_kernel(flat), expected)
 
 
+def test_shared_tau_and_batched_component_derivatives_are_exact():
+    ops, _, _ = _ops()
+    prior = MultiComponentPrior(
+        ops.labels, (SimplifiedPrior(1.2, 0.7), SimplifiedPrior(0.8, 0.7))
+    )
+    shared = MultiComponentPrior(
+        ops.labels, (SimplifiedPrior(1.2, 0.7), SimplifiedPrior(0.8, 0.7))
+    ).with_shared_tau(0.7)
+    np.testing.assert_array_equal(ops.dense_kernel(prior), ops.dense_kernel(shared))
+    values = np.random.default_rng(11).normal(size=(ops.n, 3))
+    batched = ops.apply_component_derivatives_matmat(values, prior)
+    for name, derivative in batched.items():
+        label = name.split("[", 1)[1][:-1]
+        index = ops.labels.index(label)
+        component = prior.components[index]
+        expected = component.sigma_b2 * ops.components[label].dense_kernel(component) @ values
+        if name.startswith("log_tau"):
+            expected = ops.derivative_kernels(prior)[name] @ values
+        np.testing.assert_allclose(derivative, expected, atol=1e-10)
+
+
 def test_multicomponent_reml_returns_scientific_component_scales():
     ops, _, _ = _ops()
     rng = np.random.default_rng(42)

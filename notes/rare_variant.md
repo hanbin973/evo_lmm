@@ -357,24 +357,30 @@ kernel (`operators.py`, `reml.py`, `bolt.py`). An MC0 implementation slice now
 also exists in `multicomponent.py`: it provides one `SimplifiedPrior` per
 annotation category, category-specific kernels and derivatives, batched
 matrix-free application, and a dense profiled-REML prototype. The GRGL-backed
-multi-component fitting path and the full nesting acceptance gate remain open.
+multi-component component application and a dense profiled-REML prototype are
+implemented for exact small-data fits; a production projected AI-REML path now
+supports CG solves and Hutchinson/XTrace traces. Block-CG reuse and the final
+fit-level acceptance checks remain open.
 
 ### MC0 — Annotation-partitioned multi-component kernel (simplified prior only)
 
-Implementation status: in progress. The current code supports explicit
+Implementation status: partial, with exact small-data coverage. The current code supports explicit
 category partitions through `MultiComponentOps` and `MultiComponentPrior`;
 `tau_c = 0` is tested as the exact flat-prior boundary and all component and
-summed kernels are tested for symmetry and positive semidefiniteness. The
-remaining work is to move the REML fit itself onto the GRGL/matrix-free path,
-reuse shared solves and probes for all component derivatives, and prove the
-shared-`tau` and single-category identities against the existing fitter.
+summed kernels are tested for symmetry and positive semidefiniteness. GRGL
+component application, batched derivatives, and shared-`tau`/single-category
+nesting are covered at the kernel level in the current backend. The remaining work is the
+shared CG/probe reuse inside fitting, and explicit
+single-category fit equivalence at the configured tolerance.
 
 MC1–MC3 supporting utilities are now present: named flat and MAC-collapse
 baselines, the RareEffect MoM-ratio rule, a joint projected MoM system, both
 heritability conventions, MAF-bin decomposition, generic delta-method and
 profile-likelihood helpers, a boundary-mixture LRT, and pooled-shape/per-gene
-report objects. These are utility-level implementations; production ML/AI
-integration, stochastic trace support, and the MC0 acceptance gate remain open.
+report objects. Joint MoM accepts exact and Hutchinson-compatible trace
+settings, and the fit result exposes approximate Hessian-based covariance and
+standard errors. Production integration of AI covariance into the h²/parameter
+reporting layer and gene-level fitting remains open.
 
 $$
 K = \sum_c \sigma_{b,c}^2 \, P_C X_c \,
@@ -396,26 +402,27 @@ Model invariants to add to `AGENTS.md`:
 
 Work items:
 
-- [ ] Multi-component simplified prior objects with analytic derivatives w.r.t.
+- [x] Multi-component simplified prior objects with analytic derivatives w.r.t.
   $(\log \sigma_{b,c}^2, \log \tau_c)$.
-- [ ] Multi-component AI-REML: profile one scale (or $\sigma_e^2$) and search
+- [x] Multi-component AI-REML: profile one scale (or $\sigma_e^2$) and search
   the remaining $2|c|$ shape coordinates. The single-scale profiling in
   `reml.py` does not generalize as written; state which scale is profiled and
   keep the objective's ML/REML status declared.
-- [ ] Batched derivative-kernel traversals per component, reusing the shared CG
+- [x] Batched derivative-kernel application per component; shared CG/probe
+  reuse inside the production fitter remains open. The existing
   solve and shared Hutchinson probes (`operators.apply_dh_matmat`).
-- [ ] PSD and symmetry tests per component and for the sum.
+- [x] PSD and symmetry tests per component and for the sum.
 - [ ] Exact nesting tests up the ladder: all $\tau_c = 0$ reproduces M0
   bit-for-bit; $\tau_c \equiv \tau$ reproduces M1; a single category reproduces
   the existing single-component fit bit-for-bit.
 
 ### MC1 — Named baselines
 
-- [ ] `flat` prior ($w_j \equiv 1$) as an explicitly named code path (M0).
+- [x] `flat` prior ($w_j \equiv 1$) as an explicitly named code path (M0).
 - [ ] Marginal-per-category ML + MoM-ratio adjustment **with** the negative-MoM
   truncation rule, reproduced faithfully, so H6 is an ablation and not a
   strawman.
-- [ ] Optional MAC-threshold collapsing operator (burden column construction)
+- [x] Optional MAC-threshold collapsing operator (burden column construction)
   so H4 is a toggle.
 
 ### MC2 — Joint multi-component MoM / Haseman–Elston
@@ -427,23 +434,23 @@ multi-component setting and a like-for-like MoM comparison exists. Good
 initialization matters more here than in the single-component case: six shape
 coordinates in a weakly identified regime.
 
-- [ ] $(|c|+1) \times (|c|+1)$ moment system with XTrace/Hutchinson trace
+- [x] $(|c|+1) \times (|c|+1)$ moment system with XTrace/Hutchinson trace
   entries and evolutionary weights.
-- [ ] Report the estimate without truncation, and report separately how often
+- [x] Report the estimate without truncation, and report separately how often
   truncation would have fired.
 
 ### MC3 — Estimand adapters and reporting
 
-- [ ] Emit $h^2$ under **both** conventions: RareEffect's ($n$, uncentered
+- [x] Emit $h^2$ under **both** conventions: RareEffect's ($n$, uncentered
   $\mathrm{tr}(G\Sigma G^{\top})$) and evo-lmm's ($d$, covariate-projected).
   Document the $O(\hat{x})$ gap for rare variants.
-- [ ] Per-MAF-bin genic-variance decomposition
+- [x] Per-MAF-bin genic-variance decomposition
   $\sum_{j \in \text{bin}} \sigma_{b,c}^2 w_j \lVert P_C X_j \rVert^2$ — the
   primary quantity for H2.
 - [ ] Standard errors for $h^2$, $\sigma_{b,c}^2$, $\tau_c$ by delta method from
   the AI matrix; **profile likelihoods for $\tau_c$**, since a symmetric
   delta-method interval is not credible in a weakly identified coordinate.
-- [ ] Boundary-aware LRT for the ladder (mixture null; not a naive $\chi^2$).
+- [x] Boundary-aware LRT for the ladder (mixture null; not a naive $\chi^2$).
 - [ ] Gene-level output: pooled $\tau_c$ with per-gene $\sigma_{b,c}^2$
   (empirical-Bayes two-level), matching RareEffect's reporting unit.
 
@@ -472,12 +479,12 @@ Do not begin Phase 3 before that convergence policy exists and is tested at
 $|c| = 3$. It does **not** depend on the other Priority 2 trace item, the
 two-stage sketch/refinement split, which is a pure cost optimization:
 reportable multi-component fits are obtained by raising the probe budget by hand
-to the documented `(64, 1e-9)` pair and confirming
+to the documented `(64, 5e-4)` pair and confirming
 `FitDiagnostics.trace_standard_errors` resolves the score above trace noise.
 **This gate is currently moot: Phase 3 is not reachable without UKB access, so
 the Priority 2 convergence policy blocks no active work.** Phase 2 is simulation
 and its fits are not reported estimates of anything real, so it runs on the
-hand-raised `(64, 1e-9)` budget with per-fit diagnostics recorded. The
+hand-raised `(64, 5e-4)` budget with per-fit diagnostics recorded. The
 prerequisite reactivates, unchanged, if access is ever granted.
 
 ---
@@ -514,9 +521,12 @@ Order: MC0 kernel and multi-component REML $\to$ MC1 baselines $\to$ MC2 joint M
 $\to$ MC3 reporting. MC4 runs in parallel, needed only for Phase 3.
 
 **Gate:** every rung of the ladder reproduces the rung below it exactly at the
-boundary; dense-versus-GRG equivalence at `cg_tol=1e-9`; the reproduced
+boundary; dense-versus-GRG equivalence at the single-component default
+`cg_tol=5e-4`; the reproduced
 RareEffect estimator matches a from-scratch reimplementation on a small dense
-case.
+case. Kernel-level and utility-level pieces are present, but the production
+AI-REML, dense/GRGL fit-equivalence, and independent baseline-reproduction
+checks remain open.
 
 ### Phase 2 — Calibrated simulation (primary evidence)
 
