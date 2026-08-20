@@ -408,10 +408,9 @@ every point listed in §2.5:
 - **Per-column relative target**
   $\lVert r \rVert^2 \le \max(\lVert r_0 \rVert^2, 1) \cdot$ `cg_tol`$^2$,
   with `cg_tol = 5e-4` by default, deliberately set to GRAPP's value so the
-  two solvers do comparable work per application. Earlier releases defaulted
-  to `1e-9`; that tolerance is still the right choice for a reportable
-  estimate or a dense-oracle comparison, and the equivalence tests pin it
-  explicitly.
+  two solvers do comparable work per application. Tighter tolerances may be
+  used only by explicit numerical-oracle tests; they are not the reportable
+  production rule.
 - **Denominator guard** on $p^{\top} H p$, and a
   `numpy.linalg.LinAlgError` **raised** if any column is still unconverged at
   the iteration cap `max(50, 4N)`. A failed solve is caught by the optimizer,
@@ -552,18 +551,12 @@ should return actionable diagnostics rather than a plausible-looking estimate.
 When reproducing GRAPP numbers, that difference in failure semantics — not just
 the tolerance values — has to be accounted for.
 
-**Tuning order.** The defaults are now the cheap end of the range: $S = 12$
-probes and `cg_tol = 5e-4`. For a reportable estimate, raise them — $S = 64$
-and `cg_tol = 1e-9` is the previous default pair and a reasonable target — and
-read `FitDiagnostics.trace_standard_errors` to confirm the score is resolved
-above trace noise. Going the other way, reduce $S$ before loosening `cg_tol`
-further: the probe count multiplies the dominant CG batch width, while `cg_tol`
-governs the Newton iteration's ability to tell a real score from solver error.
-Five probes have been measured as insufficient for final refinement — they
-shifted shape estimates materially and enlarged trace uncertainty — which is
-why the planned two-stage scheme keeps a small sketch budget for early steps
-and a larger, deterministically nested refinement budget for anything
-reportable.
+**Tuning order.** The defaults remain the cheap end of the range: $S = 12$
+probes and `cg_tol = 5e-4`. If additional stochastic trace precision is useful,
+raise $S$ while retaining the sketch CG tolerance and inspect
+`FitDiagnostics.trace_standard_errors`; this is diagnostic information, not a
+second convergence rule. The planned two-stage refinement scheme remains
+deferred.
 
 ## 7. Source map
 

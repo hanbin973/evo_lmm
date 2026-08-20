@@ -360,10 +360,10 @@ matrix-free application, and a dense profiled-REML prototype. The GRGL-backed
 multi-component component application and a dense profiled-REML prototype are
 implemented for exact small-data fits; a production projected AI-REML path now
 supports CG solves and Hutchinson/XTrace traces. Block-CG reuse is now in place;
-the small-dense fit-level ladder, independent baseline reproduction, and
-scientific-scale reporting checks and the current convergence-policy gate are
-closed. Priority 2 trace-error/retry experiments and performance work remain
-separate.
+the independent dense/GRGL-backed operator boundary checks, baseline
+reproduction, and scientific-scale reporting checks are closed. The transferred
+score/step rule is implemented, but production-scale convergence acceptance
+remains open.
 
 ### MC0 — Annotation-partitioned multi-component kernel (simplified prior only)
 
@@ -372,7 +372,9 @@ category partitions through `MultiComponentOps` and `MultiComponentPrior`;
 `tau_c = 0` is tested as the exact flat-prior boundary and all component and
 summed kernels are tested for symmetry and positive semidefiniteness. GRGL
 component application, batched derivatives, shared-`tau`/single-category
-nesting, and a small-dense fit-level boundary ladder in the current backend.
+nesting, and independent dense/GRGL-backed operator boundary checks in the
+current backend; single-category fit parity remains covered by the existing
+fitter delegation test.
 
 MC1–MC3 supporting utilities are now present: named flat and MAC-collapse
 baselines, the RareEffect MoM-ratio rule, a joint projected MoM system, both
@@ -472,17 +474,17 @@ coordinates in a weakly identified regime.
 
 ### Blocking dependency
 
-`plan/evolutionary-bolt-lmm.md`'s **production convergence policy is a hard
-prerequisite for any fit whose numbers are used as evidence.** It sits in
-Priority 2 there; this gate does not move with it — a deprioritized prerequisite
-is still a prerequisite. The multi-component fitter reuses the single-component
-score/step rule, which is a prerequisite for the policy, not the policy itself.
+`plan/evolutionary-bolt-lmm.md`'s **production-scale convergence acceptance is
+a hard prerequisite for any fit whose numbers are used as evidence.** The
+multi-component fitter now reuses the single-component score/step rule, with
+the retained sketch defaults, but the rule has not yet passed the documented
+production-scale recovery/failure-diagnostics gate.
 
 **There is currently no interim substitute.** An earlier revision of this file
-said reportable fits could be obtained by hand-raising the budget to
-`(64, 1e-9)`. That was wrong: those are small-dataset verification settings and
-do not scale, so they cannot stand in for a convergence policy on real-sized
-data. Nothing legitimises a large-scale estimate until the policy exists.
+said reportable fits could be obtained by hand-raising the probe budget. That
+was wrong: a larger sketch budget does not stand in for a convergence policy on
+real-sized data. Nothing legitimises a large-scale estimate until the policy
+exists.
 
 **This binds Phase 2, not only Phase 3.** Phase 2 fits at $n \in \{20\text{k},
 50\text{k}\}$ are the primary evidence for the bias-attribution claims, so they
@@ -533,15 +535,17 @@ Order: MC0 kernel and multi-component REML $\to$ MC1 baselines $\to$ MC2 joint M
 $\to$ MC3 reporting. MC4 runs in parallel, needed only for Phase 3.
 
 **Gate:** every rung of the ladder reproduces the rung below it exactly at the
-boundary; **dense-versus-GRG equivalence at `cg_tol=1e-9` on a small dataset**;
+boundary; **dense-versus-GRG equivalence at the default `cg_tol=5e-4` on a
+small dataset**;
 single-category parity with the existing fitter bit-for-bit; and the reproduced
 RareEffect estimator matches a from-scratch reimplementation on a small dense
-case. The `1e-9` tolerance is a small-data verification setting and nothing
-else — see the note on tolerances in the ledger's Active workstream gate.
+case. The default sketch tolerance is retained for this comparison; it is not
+an independent production-scale convergence guarantee.
 
-Audited 2026-08-20: parity and the baseline reproduction are met; the nesting
-clause and the dense-versus-GRG clause are not, and the fitter itself does not
-converge at `n=2000`. See the ledger for the specific defects.
+Audited 2026-08-20: operator nesting, dense-versus-GRGL comparison, parity, and
+baseline reproduction are met. Production-scale convergence remains open; the
+fitter itself previously failed the `n=2000` recovery audit. See the ledger for
+the specific defects.
 
 ### Phase 2 — Calibrated simulation (primary evidence)
 

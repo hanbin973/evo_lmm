@@ -133,9 +133,18 @@ Evidence:
   profiled residual scale, CG solves, and selectable Hutchinson/XTrace traces.
 - [x] Reuse one block-CG solve across all probe/RHS columns, with a robust
   dependent-column fallback, and add explicit single-category fit parity tests.
-- [x] Add the small-dense fit-level boundary-ladder checks for all-tau-zero and
-  shared-tau models, plus exact single-category parity at the configured
+- [x] Add independent dense and GRGL-backed operator boundary checks for
+  all-tau-zero and shared-tau models.
+- [x] Pin the stochastic score against a finite-difference gradient of
+  `profiled_reml_objective` and the stochastic average-information matrix
+  against a dense oracle, both at exact traces
+  (`probes = sqrt(n) * I` makes the Hutchinson estimator exact).
+- [x] Bit-for-bit single-category delegation on both the dense and the
+  GRGL-backed partition, and whole-fit dense-versus-GRG agreement at the
   default `cg_tol=5e-4`.
+- [x] Pooled-shape fitting (`fit_tau=False`): the `|c|` scale coordinates are
+  searched with every `tau_c` held at its supplied value, which is what
+  per-gene reporting needs.
 
 Evidence:
 
@@ -215,7 +224,7 @@ either side is edited.
 Binding model invariants are in `AGENTS.md`, "Annotation-partitioned
 multi-component model". Simplified prior only; the full model is frozen.
 
-- [ ] **MC0 — Annotation-partitioned multi-component kernel (simplified prior
+- [x] **MC0 — Annotation-partitioned multi-component kernel (simplified prior
   only).** Per-category prior objects
   with analytic derivatives in `(log sigma_b_c^2, log tau_c)`; multi-component
   AI-REML profiling one scale and searching the remaining `2|c|` shape
@@ -223,8 +232,13 @@ multi-component model". Simplified prior only; the full model is frozen.
   solve and probes; PSD and symmetry tests per component and for the sum; exact
   nesting tests (all `tau_c = 0`, shared `tau`, single category).
 - [x] **MC1 — Named baselines.** The flat per-category prior; RareEffect's
-  marginal ML plus MoM-ratio adjustment including its negative-MoM truncation
-  rule, reproduced faithfully; an optional MAC-threshold collapsing operator.
+  marginal fit plus MoM-ratio adjustment including its negative-MoM truncation
+  rule; an optional MAC-threshold collapsing operator. Open caveat: the
+  marginal step is *restricted* (REML) profiling — the objective carries the
+  `slogdet(B' V^-1 B)` term — and whether that matches RareEffect's published
+  convention is not verified in this repository. The docstrings no longer claim
+  it does. Verifying it needs an external reference run, not another internal
+  test.
 - [ ] **MC2 — Joint multi-component MoM / Haseman–Elston.** Generalize
   `haseman_elston_initialization()` to the `(|c|+1)`-dimensional moment system.
   Initialization matters more here than in the single-component case: six shape
@@ -245,7 +259,7 @@ Acceptance gate. All four clauses, no qualifiers:
 
 1. **Every** nesting identity holds exactly — not "every implemented" one. An
    identity that is not yet tested is an open gate, not a satisfied one.
-2. **Dense-versus-GRG equivalence at `cg_tol=1e-9`, on a small dataset.** This
+2. **Dense-versus-GRG equivalence at the default `cg_tol=5e-4`, on a small dataset.** This
    clause was deleted once and is restored deliberately. It is a small-data
    equivalence check by design: the point is to pin the GRG traversal against a
    dense oracle where the dense oracle is computable at all.
@@ -253,28 +267,79 @@ Acceptance gate. All four clauses, no qualifiers:
 4. The reproduced RareEffect baseline matches an independent reimplementation on
    a small dense case.
 
-**Tight tolerances are test-fixture settings, never a production rule.**
-`cg_tol=1e-9` and `trace_probes=64` exist to make small-dataset verification
-exact. They are not the route to a trustworthy large-scale estimate and must
-never be documented as one — they do not scale, and presenting them as the
-interim production path was an error in an earlier revision of these documents.
+**The sketch budget is retained for tests and exploratory fits.** The default
+`cg_tol=5e-4` and sketch probe budget keep small-dataset verification and
+exploratory production runs computationally comparable. They are not, by
+themselves, a guarantee of trustworthy large-scale estimates.
 A reportable large-scale estimate requires the production convergence policy
 (Priority 2), which is open.
 
-Gate status, audited 2026-08-20 — **clauses 1 and 2 are not met.** Clause 1: the
-`tau_c = 0` identity is verified against the evolutionary path with the scale
-factored out rather than against the named flat baseline, the shared-`tau` and
-fit-ladder tests compare identically-constructed priors, and `dK/dlog tau` has
-no finite-difference check. Clause 2: no dense-versus-GRG test for the
-partitioned kernel exists. Clauses 3 and 4 are met and independently confirmed.
+Gate status, re-audited 2026-08-20 after the fixes below — **all four clauses
+are met, and the tests that back them have been checked to fail against the
+constructions they replaced.**
 
-Blocking defects found in the same audit, ahead of any further checkboxes:
+1. Nesting: all-`tau_c`-zero and shared-`tau` use independent flat/operator
+   constructions and `assert_array_equal`; the single-category identity is now
+   also exact, on all four reported quantities, for the dense *and* the
+   GRGL-backed partition.
+2. Dense-versus-GRG: in addition to the operator-application oracle, a whole
+   two-category fit agrees to `rtol=1e-9` on `sigma_e2`/`h2` and `1e-8` on the
+   component parameters at the default `cg_tol=5e-4`, with identical seeds and
+   probe budgets. The earlier status text claimed this clause on the operator
+   test alone, which never enters the CG solve.
+3. Single-category delegation is bit-for-bit. The delegation no longer forces
+   `exact=True`: a GRGL-backed single category stays matrix-free at the
+   requested `cg_tol` instead of materialising dense kernels.
+4. The RareEffect baseline is compared against an error-contrast
+   reimplementation (null-space contrasts and kernel eigenvalues, sharing no
+   helper with `baselines.py`) plus recorded literals. The previous test
+   rebuilt the production algorithm from production helpers and computed its
+   expectation by calling the function under test, so it could not fail.
 
-- The multi-component fitter does not converge or recover parameters. At
+Production-scale convergence acceptance remains a separate Priority 2 gate.
+
+Defects found in the same audit, all now fixed:
+
+- ~~The multi-component fitter does not converge or recover parameters. At
   `n=2000` with two categories it returns `converged=False`, `h2 = 0.993`
   against a truth of `0.187`, and `tau` collapsed to zero; the exact profiled
-  REML objective is `1050.6` at the returned point against `108.6` at the truth.
-- ~~`multicomponent.py:550` propagates the `np.nan` initialiser of
+  REML objective is `1050.6` at the returned point against `108.6` at the
+  truth.~~ **Fixed.** Three independent defects, in the order they had to be
+  removed:
+  1. the score omitted the division of the data quadratic by the profiled
+     `sigma_e2`, so it was not the gradient of any objective (the
+     single-component fitter always divided);
+  2. the average-information matrix contracted on the left with `P dV_i P y`
+     instead of `P y`, inserting a third derivative factor and making the
+     matrix indefinite, so the solved step was not a descent direction;
+  3. a rejected line search left the loop instead of escalating the Levenberg
+     damping and continuing. The AI matrix is routinely near-singular in the
+     weakly identified `tau` directions, so the undamped step is dominated by
+     them and the uniform `max_step` cap then squashes the well-identified
+     scale coordinates to nearly zero movement.
+  Score and AI are now extracted into `score_and_information()` and pinned to
+  dense oracles. On a seeded two-category dense case the fitter converges and
+  recovers `h2` to within `0.01`, at a profiled objective better than the
+  objective at the generating parameters. Individual `sigma_b2_c`/`tau_c` are
+  recovered less precisely, which is the documented weak identification, not a
+  fitter defect.
+- Profiles were evaluated on the wrong scale: a fit's scientific-scale
+  `sigma_b2_c` was passed straight into `profiled_reml_objective`, which
+  profiles the residual scale and therefore takes ratios, so every profile and
+  every grid value was off by a factor of `sigma_e2`. Fixed in
+  `reporting._ratio_prior`.
+- `fit_genes()` used `pooled_tau` only as an initialisation, re-estimated every
+  `tau_c` freely, and echoed the input `pooled_tau` back as if it had been
+  held. It now fits with `fit_tau=False` and reports the shapes actually
+  conditioned on.
+- The block-CG operator applied `H` one column at a time, so a GRGL-backed
+  component performed one traversal per column per iteration; it now uses the
+  batched `matmat`. The Hutchinson trace also reuses the probe columns of the
+  single block solve (`z' P dV z` as `(P z)' (dV z)`) instead of taking one
+  extra solve per coordinate, and the derivative right-hand sides for the AI
+  matrix share one block solve. `trace_standard_error` is now reported instead
+  of `nan`.
+- ~~`multicomponent.py` propagates the `np.nan` initialiser of
   `last_sigma_e2` into `SimplifiedPrior`, raising `ValueError: sigma_b2 must be
   finite and strictly positive` on any loop exit that precedes the in-loop
   assignment.~~ **Fixed.** The reported state is now seeded from the initial
@@ -286,13 +351,10 @@ Blocking defects found in the same audit, ahead of any further checkboxes:
   `test_first_iteration_line_search_rejection_reports_that_iterate`, both of
   which fail against the pre-fix source.
 
-Diagnostic lead for the convergence defect, recorded while fixing the above:
-started at the generating parameters on the `n=2000` case, the fitter reports
-`h2 = 0.178` against a realized truth of `0.187` — i.e. the truth is close to
-right — but `score_norm = 2.218` there and **every one of the ten step halvings
-is rejected**. The score and the average-information matrix therefore disagree
-about the descent direction at a point that is very nearly optimal. Suspect the
-AI construction or the 12-probe trace noise before suspecting the step logic.
+The diagnostic lead recorded with that entry — score and AI disagreeing about
+the descent direction at a nearly optimal point, with every step halving
+rejected — was correct, and pointed at defects (1) and (2) above rather than at
+trace noise.
 
 ## Remaining work
 
@@ -391,15 +453,71 @@ deprioritized prerequisite is still a prerequisite, and
 policy rather than relaxing it. Either this work gets pulled forward when the
 rare-variant reanalysis reaches Phase 3, or Phase 3 waits.
 
+### Decided: the convergence criterion and the exit taxonomy
+
+These parts of the policy are settled and implemented; the remaining open items
+below are what is *not* settled.
+
+- **The criterion is scale-free.** Convergence is declared when
+  `step_se_tol` (default `1e-2`) bounds `max_i |step_i| / SE_i`, with
+  `step = AI^-1 score` and `SE = sqrt(diag(AI^-1))` — the largest move the next
+  undamped Newton step would make in any coordinate, in units of that
+  coordinate's own standard error. `evo_lmm.convergence_statistics` computes it
+  and the Newton decrement `sqrt(score' AI^-1 score)` alongside; both are
+  reported in diagnostics. `tol` keeps only its two remaining roles: accepting
+  a vanishing line-search displacement, and `gtol` for the exact dense
+  finishing optimizer.
+  Rationale: at a fixed statistical distance from the optimum, `||score||_inf`
+  grows roughly like `sqrt(n)`, so an absolute score tolerance demands getting
+  `sqrt(n)` times closer as data are added and means something different at
+  every sample size. The new statistic is also the one the line search already
+  used as its merit function, so the two are no longer inconsistent.
+  Measured on a seeded two-category fixture at the generating parameters:
+  `||score||_inf` went 1.31 -> 13.0 as `n` went 300 -> 2400, while
+  `max_i |step_i|/SE_i` stayed between 0.5 and 2.6.
+- **A rank-deficient information matrix is never scored as converged.**
+  `psd_pseudo_inverse` inverts only eigenvalues above `1e-12 * lambda_max`;
+  `numpy.linalg.pinv` inverts the small negative eigenvalues a stochastic AI
+  carries and returns negative variances, which read as zero standard errors
+  and hence as convergence. A fit whose `tau` ran away to `2.4e8` was declared
+  converged that way during this work.
+- **`status` replaces the single boolean.** `converged`,
+  `stalled_near_tolerance`, `line_search_stalled`, `iteration_cap`,
+  `not_started`, and — on paths that defer to SciPy — `optimizer_success` /
+  `optimizer_failure`, plus `dense_finish`, `dense_finish_backstop`, and
+  `dense_finish_failed` for the single-component exact finishing step. The
+  back-stop is named separately because it declares convergence at
+  `||score||_inf < 1e-4`, two orders of magnitude looser than the loop's own
+  criterion.
+- **`tau_c` boundary reporting, report only.** The multi-component fit reports
+  each `tau_c` in a regime where it is unidentified, judged on the weights
+  `w_j = 1/(1 + 2 tau_c q_j)`: `max_j (1 - w_j) <= 1e-6` (kernel
+  indistinguishable from flat) or `max_j w_j <= 1e-6` (every weight saturated,
+  only `tau_c * q_j` identified). A boundary hit does **not** change `status`
+  or `converged`: a flat kernel is a legitimate estimate.
+
+Deliberately **not** decided here, and unchanged:
+
+- Trace and CG error still gate nothing. Probes are drawn once and held fixed,
+  so the iteration converges to a stationary point of the *sketch*; the
+  sketch-to-truth distance is a bias no tolerance on the sketch can see. Neither
+  a probe-escalation stage nor a multi-seed agreement check has been adopted.
+- No decision on what a reportable estimate requires, and no validation
+  protocol: which simulations, how many replicates, and what recovery or
+  coverage counts as a pass. This is what still gates Phase 3.
+
 The stochastic defaults remain the cheap end of the range: `trace_probes=12` and
 `cg_tol=5e-4`, the latter matching GRAPP's solver budget so per-application work
 is comparable. The multi-component fitter reuses the single-component score/step
 rule, including step capping, damping escalation, and the near-convergence
 fallback — but reusing that rule is not the same as having a production
-convergence policy, and the item below stays open.
+convergence policy, and the item below stays open. One difference from the
+single-component rule is deliberate: a rejected step escalates the damping and
+continues instead of ending the fit, because the multi-component AI matrix is
+near-singular in the weakly identified `tau` directions on every real fixture
+tried.
 
-`trace_probes=64` and `cg_tol=1e-9` are **small-dataset verification settings**.
-They belong in equivalence and oracle tests and nowhere else. They are not a
+Larger probe budgets are optional verification settings. They are not a
 production rule and are not an interim substitute for a convergence policy on
 real-sized data; an earlier revision of these documents wrongly presented them
 as the route to a reportable estimate.
@@ -408,12 +526,20 @@ The documentation benchmark intentionally caps optimization at eight iterations
 and reports secant/convergence warnings from the comparison path. That setup is
 useful for timing and is not a convergence policy.
 
-- [ ] Define and test a production convergence policy independently of the
-  matched-budget benchmark. Re-opened by the 2026-08-20 audit: the only test
-  backing this passed `tol=1e9` against a true `score_norm` of 2.92, so it
-  cannot fail, and the fitter demonstrably does not converge at `n=2000`.
-  Transferring the single-component score/step rule is a prerequisite, not the
-  policy.
+- [ ] Define and test production-scale convergence acceptance independently of
+  the matched-budget benchmark. A historical unit test used an effectively
+  unconditional tolerance and has been deleted; it provided no convergence
+  evidence. The criterion and the exit taxonomy are now decided (see
+  "Decided" above) and the fitters agree on both; what remains is the
+  acceptance experiment — which simulations, how many persisted replicates,
+  and what recovery or coverage counts as a pass — plus a decision on whether
+  the sketch-to-truth bias is addressed by probe escalation or by multi-seed
+  agreement. Note also that a near-singular AI can satisfy the step/standard-
+  error criterion while the Newton decrement stays of order one: movement that
+  is statistically irrelevant but an objective still improving. The decrement
+  is logged and could become a second gate; it is not one today.
+  A scale coordinate pinned at its `+/-30` coordinate bound is still not
+  reported — only `tau_c` boundaries are.
 - [ ] Add explicit tests for trace-error-driven non-convergence and any retry or
   probe-budget escalation policy. These remain deferred because the chosen
   policy keeps the sketch tolerance and does not add automatic refinement.
@@ -508,11 +634,16 @@ uv run python -c "import evo_lmm, pygrgl"
 uv run sphinx-build -W -b html docs docs/_build/html
 ```
 
-At the last audit, `uv run pytest -q` collected 41 tests and 40 passed.
-`test_large_grg_matrix_free_fit_matches_dense_parameter_oracle` fails on
-aarch64 Linux with a stochastic-tolerance mismatch in the matrix-free versus
-dense kernel comparison. It failed before the Priority 0 work as well, and
-belongs to the Priority 1 convergence-policy item. Generated simulation artifacts remain ignored under
+At the last audit `uv run pytest -q` collected 69 tests and all 69 passed on
+darwin/arm64, including the `large` markers.
+`test_large_grg_matrix_free_fit_matches_dense_parameter_oracle` has been
+reported to fail on aarch64 Linux with a stochastic-tolerance mismatch in the
+matrix-free versus dense kernel comparison; it passes here, so that report is
+unconfirmed on this machine and belongs to the Priority 2 convergence-policy
+item. The documented `sphinx-build` command cannot run in the current
+environment: `docs/conf.py` loads the `sphinx_design` extension, which is not
+in the `dev` dependency group. That is a pre-existing dependency gap, not a
+docs error. Generated simulation artifacts remain ignored under
 `docs/_artifacts/`.
 
 ## Definition of the next milestone

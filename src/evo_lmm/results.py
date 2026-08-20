@@ -12,7 +12,41 @@ from .priors import EvolutionaryPrior
 
 @dataclass
 class FitDiagnostics:
-    """Numerical and identifiability diagnostics from a fit."""
+    """Numerical and identifiability diagnostics from a fit.
+
+    ``converged`` is a summary; ``status`` names *how* the fit ended and is the
+    field to branch on:
+
+    ``converged``
+        The step/standard-error criterion was met at an accepted iterate.
+    ``stalled_near_tolerance``
+        Every step halving was rejected, but the criterion was within ten times
+        its tolerance, so the iterate is accepted as converged.
+    ``line_search_stalled``
+        The iteration budget ran out and the final iteration's step was
+        rejected.
+    ``iteration_cap``
+        The iteration budget ran out with steps still being accepted.
+    ``not_started``
+        ``max_iter=0``; the reported state is the initial point.
+    ``dense_finish``
+        The exact dense finishing optimizer reported success.
+    ``dense_finish_backstop``
+        The finishing optimizer did not report success and convergence was
+        declared only by the loose ``||score||_inf < 1e-4`` back-stop.
+    ``dense_finish_failed``
+        The finishing optimizer ran and convergence was not declared.
+
+    ``step_se_norm`` is the convergence statistic itself:
+    ``max_i |step_i| / SE_i`` with ``step = AI^-1 score`` and
+    ``SE = sqrt(diag(AI^-1))`` -- the largest move the next undamped Newton
+    step would make in any coordinate, in units of that coordinate's own
+    standard error.  ``newton_decrement`` is ``sqrt(score' AI^-1 score)``,
+    logged for comparison.  Both are dimensionless, invariant to a
+    reparameterization of the coordinates, and order one at a fixed distance
+    from the optimum in standard-error units -- unlike ``score_norm``, which at
+    the same point grows roughly like ``sqrt(n)``.
+    """
 
     converged: bool
     iterations: int
@@ -34,6 +68,9 @@ class FitDiagnostics:
     random_seed: int | None = None
     boundary_hits: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
+    status: str = "unknown"
+    step_se_norm: float = float("nan")
+    newton_decrement: float = float("nan")
 
 
 @dataclass

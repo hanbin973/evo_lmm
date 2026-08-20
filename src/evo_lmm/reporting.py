@@ -51,6 +51,23 @@ class FitReport:
     tau_profiles: dict[Any, ProfileLikelihood] | None = None
 
 
+def _ratio_prior(fit: MultiComponentFit, components: Sequence[SimplifiedPrior]) -> MultiComponentPrior:
+    """Convert scientific-scale components to the profiled objective's scale.
+
+    :func:`profiled_reml_objective` profiles the residual scale, so its prior
+    argument is the ratio ``sigma_b2_c / sigma_e2``.  A fit reports
+    ``sigma_b2_c`` on the scientific scale, so feeding a fit's prior back
+    unconverted evaluates the objective at the wrong point whenever
+    ``sigma_e2 != 1`` -- and takes grid values on the wrong scale with it.
+    """
+    scale = max(float(fit.sigma_e2), np.finfo(float).tiny)
+    return MultiComponentPrior(
+        fit.ops.labels,
+        tuple(SimplifiedPrior(component.sigma_b2 / scale, component.tau)
+              for component in components),
+    )
+
+
 def profile_tau(
     tau_values: Sequence[float], objective: Callable[[float], float], *, confidence: float = 0.95
 ) -> ProfileLikelihood:
@@ -118,13 +135,14 @@ def fit_tau_profiles(
             raise KeyError(label)
         index = fit.ops.labels.index(label)
 
-        def objective(tau: float) -> float:
+        def objective(tau: float, index: int = index) -> float:
             components = list(fit.prior.components)
             components[index] = SimplifiedPrior(components[index].sigma_b2, tau)
-            prior = MultiComponentPrior(fit.ops.labels, tuple(components))
             if fit.phenotype is None:
                 raise ValueError("fit does not retain a phenotype for profiling")
-            return profiled_reml_objective(fit.ops, fit.phenotype, prior)[0]
+            return profiled_reml_objective(
+                fit.ops, fit.phenotype, _ratio_prior(fit, components)
+            )[0]
 
         profiles[label] = profile_tau(grid, objective)
     return profiles
@@ -147,7 +165,7 @@ def fit_parameter_profiles(
         if parameter not in ("sigma_b2", "tau"):
             raise KeyError(name)
 
-        def objective(value: float) -> float:
+        def objective(value: float, index: int = index, parameter: str = parameter) -> float:
             if value <= 0.0 and parameter == "sigma_b2":
                 return float("inf")
             components = list(fit.prior.components)
@@ -156,10 +174,12 @@ def fit_parameter_profiles(
                 value if parameter == "sigma_b2" else current.sigma_b2,
                 value if parameter == "tau" else current.tau,
             )
-            prior = MultiComponentPrior(fit.ops.labels, tuple(components))
             if fit.phenotype is None:
                 raise ValueError("fit does not retain a phenotype for profiling")
-            return profiled_reml_objective(fit.ops, fit.phenotype, prior)[0]
+            # Grid values are on the scientific scale, like the reported fit.
+            return profiled_reml_objective(
+                fit.ops, fit.phenotype, _ratio_prior(fit, components)
+            )[0]
 
         profiles[name] = profile_tau(grid, objective)
     return profiles
@@ -174,7 +194,13 @@ def fit_genes(
     trace_method: str = "hutchinson",
     trace_probes: int = 12,
 ) -> dict[Any, GeneComponentReport]:
-    """Fit per-gene scales with category shapes pooled across genes."""
+    """Fit per-gene scales with the category shapes pooled across genes.
+
+    ``pooled_tau`` is held fixed for every gene (``fit_tau=False``); it is a
+    pooled estimate, not a per-gene starting point.  Only the ``|c|`` scale
+    coordinates are searched, so the reported ``pooled_tau`` is the shape the
+    per-gene scales were actually conditioned on.
+    """
     reports: dict[Any, GeneComponentReport] = {}
     for gene, ops in genes.items():
         if set(pooled_tau) != set(ops.labels):
@@ -186,10 +212,14 @@ def fit_genes(
         )
         fit = fit_multicomponent_reml(
             ops, phenotype, initial=initial, max_iter=max_iter,
-            trace_method=trace_method, trace_probes=trace_probes,
+            trace_method=trace_method, trace_probes=trace_probes, fit_tau=False,
         )
+        fitted_tau = {label: component.tau
+                      for label, component in zip(fit.prior.labels, fit.prior.components)}
+        if any(fitted_tau[label] != pooled_tau[label] for label in ops.labels):
+            raise RuntimeError("pooled shapes moved during a pooled-shape fit")
         reports[gene] = gene_component_report(
-            gene, {label: pooled_tau[label] for label in ops.labels},
+            gene, fitted_tau,
             {label: component.sigma_b2 for label, component in zip(fit.prior.labels, fit.prior.components)},
         )
     return reports

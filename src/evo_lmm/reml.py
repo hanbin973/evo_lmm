@@ -193,6 +193,80 @@ def profiled_average_information(
     return (direct - np.outer(data, data) / (2.0 * q)) / max(float(scale), np.finfo(float).tiny)
 
 
+def psd_pseudo_inverse(matrix: np.ndarray, rcond: float = 1e-12) -> tuple[np.ndarray, int]:
+    """Pseudo-invert a symmetric PSD matrix through its eigendecomposition.
+
+    Returns the inverse and the number of retained directions.  Eigenvalues at
+    or below ``rcond * max(eigenvalue)`` -- including the small *negative* ones
+    a stochastic average-information matrix can carry -- are dropped rather
+    than inverted.  ``numpy.linalg.pinv`` uses a much smaller cutoff on
+    singular values, so it happily inverts a ``-2e-15`` eigenvalue and returns
+    negative variances on the diagonal, which then read as zero standard errors
+    and as spurious convergence.
+    """
+    values = np.asarray(matrix, dtype=np.float64)
+    if values.size == 0:
+        return values.copy(), 0
+    eigenvalues, vectors = np.linalg.eigh((values + values.T) * 0.5)
+    largest = float(np.max(eigenvalues))
+    if not np.isfinite(largest) or largest <= 0.0:
+        return np.zeros_like(values), 0
+    keep = eigenvalues > rcond * largest
+    inverted = np.zeros_like(eigenvalues)
+    inverted[keep] = 1.0 / eigenvalues[keep]
+    return (vectors * inverted) @ vectors.T, int(np.count_nonzero(keep))
+
+
+def convergence_statistics(score: np.ndarray, ai: np.ndarray) -> tuple[float, float]:
+    """Return the scale-free convergence statistics ``(step_se_norm, decrement)``.
+
+    ``step_se_norm = max_i |step_i| / SE_i`` with ``step = AI^-1 score`` and
+    ``SE_i = sqrt((AI^-1)_ii)``: the largest move the next undamped Newton step
+    would make in any coordinate, measured in that coordinate's own standard
+    error.  ``decrement = sqrt(score' AI^-1 score)`` is the Newton decrement,
+    which approximates twice the objective decrease the step would buy.
+
+    Both are dimensionless and invariant to a reparameterization of the
+    coordinates.  They also measure distance from the optimum in standard-error
+    units, so they stay order one at a fixed statistical distance regardless of
+    ``n``, whereas ``||score||_inf`` at the same point grows roughly like
+    ``sqrt(n)``.  A fixed absolute score tolerance therefore demands getting
+    ``sqrt(n)`` times closer as data are added, which is why it is not the gate.
+
+    Both statistics see only the directions the information matrix actually
+    identifies (see :func:`psd_pseudo_inverse`).  A rank-deficient information
+    matrix is *not* treated as converged: if no direction survives the cutoff,
+    or the score has a component the pseudo-inverse cannot resolve, the result
+    is ``inf``.  A score component lying in a genuinely unidentified direction
+    is invisible to any curvature-based rule; it surfaces through the boundary
+    warnings and ``ai_condition`` instead.
+    """
+    values = np.asarray(score, dtype=np.float64)
+    matrix = np.asarray(ai, dtype=np.float64)
+    if values.size == 0:
+        return 0.0, 0.0
+    if not np.all(np.isfinite(values)) or not np.all(np.isfinite(matrix)):
+        return float("inf"), float("inf")
+    inverse, retained = psd_pseudo_inverse(matrix)
+    if retained == 0:
+        return float("inf"), float("inf")
+    step = inverse @ values
+    variances = np.diag(inverse)
+    if np.any(variances < 0.0):
+        return float("inf"), float("inf")
+    standard_errors = np.sqrt(variances)
+    ratios = np.zeros_like(step)
+    informative = standard_errors > 0.0
+    ratios[informative] = np.abs(step[informative]) / standard_errors[informative]
+    # A coordinate with no standard error is unidentified, not converged: only
+    # a coordinate the step also leaves untouched may be scored as zero.
+    unresolved = ~informative & (np.abs(step) > 0.0)
+    if np.any(unresolved):
+        return float("inf"), float("inf")
+    decrement = float(np.sqrt(max(float(values @ inverse @ values), 0.0)))
+    return float(np.max(ratios)), decrement
+
+
 @dataclass
 class _Quantities:
     coordinates: np.ndarray
@@ -398,6 +472,7 @@ def fit_reml(
     seed: int = 0,
     max_iter: int = 50,
     tol: float = 1e-6,
+    step_se_tol: float = 1e-2,
     cg_tol: float = 5e-4,
     max_step: float = 2.0,
     exact: bool | None = None,
@@ -415,9 +490,22 @@ def fit_reml(
     The stochastic defaults are deliberately cheap and match GRAPP's solver
     budget: ``trace_probes=12`` and ``cg_tol=5e-4``. They are appropriate for
     exploratory fits and for benchmark parity, not for final reported
-    estimates. Raise both (for example ``trace_probes=64``, ``cg_tol=1e-9``)
-    when an estimate is reportable, and check
-    ``FitDiagnostics.trace_standard_errors`` before trusting a score.
+    estimates. If a larger stochastic trace budget is desired, raise
+    ``trace_probes`` while retaining the sketch solver tolerance
+    ``cg_tol=5e-4``; inspect ``FitDiagnostics.trace_standard_errors`` as a
+    diagnostic rather than treating it as a separate convergence rule.
+
+    Convergence is declared when ``step_se_tol`` bounds
+    ``max_i |step_i| / SE_i`` -- see :func:`convergence_statistics`.  The
+    default ``1e-2`` means the next undamped Newton step would move no
+    coordinate by more than one percent of its own standard error.  ``tol``
+    keeps its two remaining roles: the line search accepts a trial
+    displacement below it, and it is passed as ``gtol`` to the exact dense
+    finishing optimizer.  It is no longer the convergence gate, because
+    ``||score||_inf`` grows with ``n`` and a fixed absolute bound on it is a
+    different requirement at every sample size.  ``FitDiagnostics.status``
+    names how the fit ended; ``converged`` alone does not distinguish the
+    criterion being met from the finishing optimizer's loose back-stop.
     """
 
     if model is not None and model != ops.model_name:
@@ -469,7 +557,9 @@ def fit_reml(
     is_dense = all(chrom.dense is not None for chrom in ops._chromosomes)
     use_exact = is_dense if exact is None else bool(exact)
     converged = False
+    status = "not_started"
     last_step = 0.0
+    last_rejected = False
     last_q: _Quantities | None = None
     ai_condition = np.inf
     damping = 0.0
@@ -495,8 +585,15 @@ def fit_reml(
         active_ai = ai[np.ix_(active_coordinates, active_coordinates)]
         if np.all(np.isfinite(ai)) and ai.size:
             ai_condition = float(np.linalg.cond(active_ai))
-        if np.linalg.norm(active_score, ord=np.inf) <= tol and (last_step <= tol or iteration > 1):
+        # Convergence is judged on the scale-free step/standard-error
+        # statistic, not on ``||score||_inf``: the raw score grows with the
+        # sample size, so an absolute score tolerance is a different demand at
+        # every ``n``.  This is also the statistic the line search already uses
+        # as its merit function.
+        step_se_norm, newton_decrement = convergence_statistics(active_score, active_ai)
+        if step_se_norm <= step_se_tol:
             converged = True
+            status = "converged"
             accepted_iterations = iteration - 1
             break
         if not np.all(np.isfinite(ai)) or ai_condition > 1e12:
@@ -537,13 +634,19 @@ def fit_reml(
                 continue
         if not accepted:
             last_step = 0.0
+            last_rejected = True
             damping = max(1e-6, damping * 10.0 if damping else 1e-6)
-            if np.linalg.norm(active_score, ord=np.inf) <= 10.0 * tol:
+            if step_se_norm <= 10.0 * step_se_tol:
                 converged = True
+                status = "stalled_near_tolerance"
                 break
+            continue
+        last_rejected = False
 
     if last_q is None:
         raise RuntimeError("REML fitting failed before evaluating a valid covariance")
+    if not converged and int(max_iter) > 0:
+        status = "line_search_stalled" if last_rejected else "iteration_cap"
 
     # Exact dense minimisation is a robust finishing step for small matrices.
     # It uses the same analytic score and only repairs an AI iteration that was
@@ -568,7 +671,15 @@ def fit_reml(
         result = minimize(objective, optimizer_coords, jac=jac, method="L-BFGS-B", bounds=bounds, options={"maxiter": max_iter * 4, "ftol": 1e-12, "gtol": tol})
         if np.isfinite(result.fun):
             coords = np.r_[result.x, 20.0] if fixed_r_boundary else np.asarray(result.x, dtype=np.float64)
-            converged = bool(result.success) or np.linalg.norm(jac(coords), ord=np.inf) < 1e-4
+            optimizer_success = bool(result.success)
+            backstop = float(np.linalg.norm(jac(coords), ord=np.inf)) < 1e-4
+            converged = optimizer_success or backstop
+            # The back-stop is two orders of magnitude looser than the loop's
+            # own criterion, so it is named separately rather than reported as
+            # an ordinary convergence.
+            status = ("dense_finish" if optimizer_success
+                      else "dense_finish_backstop" if backstop
+                      else "dense_finish_failed")
             last_q = _quantities(ops, y_arr, coords, probes, exact=True, cg_tol=cg_tol)
             accepted_iterations += int(result.nit)
 
@@ -587,6 +698,11 @@ def fit_reml(
         if 1.0 - prior.rho2 <= 1e-10:
             warnings.add("rho^2 is at the simplified-model boundary")
     score_norm = float(np.linalg.norm(last_q.score, ord=np.inf))
+    reported_active = np.array([0, 1], dtype=np.int64) if fixed_r_boundary else np.arange(last_q.score.size)
+    final_step_se, final_decrement = convergence_statistics(
+        last_q.score[reported_active],
+        ((last_q.ai + last_q.ai.T) * 0.5)[np.ix_(reported_active, reported_active)],
+    )
     if use_exact:
         objective_value = float(last_q.objective)
     else:
@@ -614,6 +730,9 @@ def fit_reml(
         random_seed=int(seed),
         boundary_hits=tuple(sorted(warnings)),
         warnings=tuple(sorted(warnings)),
+        status=status,
+        step_se_norm=float(final_step_se),
+        newton_decrement=float(final_decrement),
     )
     return FitResult(
         prior=prior,

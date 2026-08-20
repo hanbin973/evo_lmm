@@ -33,6 +33,7 @@ dev = [
     "matplotlib>=3.11.1",
     "pydata-sphinx-theme>=0.20.0",
     "pytest>=8.3",
+    "ruff>=0.16.3",
     "sphinx>=9.1.0",
 ]
 

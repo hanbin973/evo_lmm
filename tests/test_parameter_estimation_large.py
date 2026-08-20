@@ -115,9 +115,15 @@ def test_large_full_exact_fit_recovers_parameters_and_improves_reml():
         )
 
     assert ops.n == 400
-    assert fit.diagnostics.converged
+    # ``status`` is asserted rather than ``converged``: the latter is also set
+    # by the finishing optimizer's loose ``||score||_inf < 1e-4`` back-stop.
+    assert fit.diagnostics.status == "converged"
     assert fit.diagnostics.trace_estimator == "exact"
-    assert fit.diagnostics.score_norm < 1e-4
+    # Stationarity is checked on the scale-free statistics.  ``score_norm`` is
+    # not a criterion: it grows with the sample size, so no absolute bound on
+    # it means the same thing at two different ``n``.
+    assert fit.diagnostics.step_se_norm <= 1e-2
+    assert fit.diagnostics.newton_decrement <= 1e-2
     assert np.isclose(fit.prior.sigma_b2, true_prior.sigma_b2, rtol=0.5)
     assert np.isclose(fit.prior.tau, true_prior.tau, rtol=0.75)
     assert np.isclose(fit.prior.rho, true_prior.rho, rtol=0.5, atol=0.25)

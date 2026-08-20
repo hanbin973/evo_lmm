@@ -27,6 +27,7 @@ from .priors import (
 )
 from .reml import (
     DenseREMLOracle,
+    convergence_statistics,
     exact_average_information,
     exact_reml_score,
     exact_reml_loglikelihood,
@@ -77,6 +78,7 @@ __all__ = [
     "AssociationResult",
     "CalibrationResult",
     "DenseREMLOracle",
+    "convergence_statistics",
     "EvolutionaryLmmOps",
     "EvolutionaryPrior",
     "FitDiagnostics",

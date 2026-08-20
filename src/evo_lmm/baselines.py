@@ -167,7 +167,14 @@ def joint_mom_initialization(
 
 @dataclass(frozen=True)
 class RareEffectBaselineResult:
-    """Marginal ML estimates and the faithfully reproduced MoM-ratio rule."""
+    """Marginal per-category estimates plus the MoM-ratio adjustment.
+
+    ``marginal_scales`` are *restricted* (REML) marginal estimates: the
+    objective in :func:`fit_rare_effect_baseline` carries the
+    ``slogdet(B' V^-1 B)`` term.  Whether RareEffect's published pipeline uses
+    ML or REML here is not verified in this repository, so do not describe this
+    field as reproducing an ML convention.
+    """
 
     marginal_scales: np.ndarray
     marginal_mom_scales: np.ndarray
@@ -181,7 +188,7 @@ def fit_rare_effect_baseline(
 ) -> RareEffectBaselineResult:
     """Fit the named flat baseline marginally and apply the MoM-ratio rule.
 
-    Each category is fitted independently with the existing exact REML engine
+    Each category is fitted independently by exact restricted (REML) profiling
     at the ``tau=0`` boundary.  The joint adjustment is then computed from the
     partitioned moment system; no evolutionary weighting is introduced.
     """
