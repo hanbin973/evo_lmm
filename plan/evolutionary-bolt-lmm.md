@@ -253,7 +253,8 @@ multi-component model". Simplified prior only; the full model is frozen.
   frequency recomputation; measured GRG compression on exome rare variants.
   Needed only for the access-gated Phase 3, so it is the lowest priority here.
 
-Order: MC0, then MC1, then MC2, then MC3. MC4 is independent and deferred.
+Order: MC0 and MC1 are done; MC2 next, then MC3. MC4 is independent and
+deferred.
 
 Acceptance gate. All four clauses, no qualifiers:
 
@@ -270,9 +271,10 @@ Acceptance gate. All four clauses, no qualifiers:
 **The sketch budget is retained for tests and exploratory fits.** The default
 `cg_tol=5e-4` and sketch probe budget keep small-dataset verification and
 exploratory production runs computationally comparable. They are not, by
-themselves, a guarantee of trustworthy large-scale estimates.
-A reportable large-scale estimate requires the production convergence policy
-(Priority 2), which is open.
+themselves, a guarantee of trustworthy large-scale estimates, and nothing in
+this file now measures whether they are: the convergence criterion is decided
+(Priority 2, "Convergence policy — decided"), and acceptance at realistic data
+size was removed by decision rather than satisfied.
 
 Gate status, re-audited 2026-08-20 after the fixes below — **all four clauses
 are met, and the tests that back them have been checked to fail against the
@@ -296,16 +298,16 @@ constructions they replaced.**
    rebuilt the production algorithm from production helpers and computed its
    expectation by calling the function under test, so it could not fail.
 
-Production-scale convergence acceptance remains a separate Priority 2 gate.
+The convergence criterion these fits are judged by is recorded under
+Priority 2, "Convergence policy — decided".
 
 Defects found in the same audit, all now fixed:
 
-- ~~The multi-component fitter does not converge or recover parameters. At
-  `n=2000` with two categories it returns `converged=False`, `h2 = 0.993`
-  against a truth of `0.187`, and `tau` collapsed to zero; the exact profiled
-  REML objective is `1050.6` at the returned point against `108.6` at the
-  truth.~~ **Fixed.** Three independent defects, in the order they had to be
-  removed:
+- The fitter did not converge or recover parameters: at `n=2000` with two
+  categories it returned `converged=False`, `h2 = 0.993` against a truth of
+  `0.187`, `tau` collapsed to zero, and a profiled REML objective of `1050.6`
+  against `108.6` at the truth. Three independent defects, in the order they
+  had to be removed:
   1. the score omitted the division of the data quadratic by the profiled
      `sigma_e2`, so it was not the gradient of any objective (the
      single-component fitter always divided);
@@ -339,22 +341,12 @@ Defects found in the same audit, all now fixed:
   extra solve per coordinate, and the derivative right-hand sides for the AI
   matrix share one block solve. `trace_standard_error` is now reported instead
   of `nan`.
-- ~~`multicomponent.py` propagates the `np.nan` initialiser of
-  `last_sigma_e2` into `SimplifiedPrior`, raising `ValueError: sigma_b2 must be
-  finite and strictly positive` on any loop exit that precedes the in-loop
-  assignment.~~ **Fixed.** The reported state is now seeded from the initial
-  point before the loop, and the line-search-rejection branch records its own
-  iterate instead of breaking past the assignments. Two exits triggered it:
-  `max_iter=0`, and a first-iteration line-search rejection — reachable simply
-  by starting the fit at the generating parameters. Covered by
+- A `nan` placeholder for `last_sigma_e2` reached `SimplifiedPrior` on any loop
+  exit before the in-loop assignments, raising a validator error instead of
+  returning diagnostics. The reported state is seeded from the initial point,
+  and the rejection branch records its own iterate. Covered by
   `test_max_iter_zero_returns_seeded_diagnostics_instead_of_raising` and
-  `test_first_iteration_line_search_rejection_reports_that_iterate`, both of
-  which fail against the pre-fix source.
-
-The diagnostic lead recorded with that entry — score and AI disagreeing about
-the descent direction at a nearly optimal point, with every step halving
-rejected — was correct, and pointed at defects (1) and (2) above rather than at
-trace noise.
+  `test_first_iteration_line_search_rejection_reports_that_iterate`.
 
 ## Remaining work
 
@@ -421,8 +413,10 @@ fit is stopped at a small iteration cap and leaves `h2` near its upper boundary
 on null data, the calibrated statistic inflates (`lambda_GC` around 1.7). The
 same null data with a converged fit gives `lambda_GC` in line with plain
 regression. Calibration corrects the statistic's scale, not a variance-component
-fit that has not converged, which is why the convergence-policy work, now under
-Priority 2, remains a gate on any reported estimate.
+fit that has not converged. The reader of an association result therefore has to
+check the fit's `status` — an `iteration_cap` fit is exactly the case that
+inflated here — since no acceptance test at realistic data size stands behind
+the convergence criterion.
 
 ### Priority 1: reporting-surface correctness
 
@@ -440,23 +434,13 @@ how convergence is declared.
 Acceptance gate: reported fixed effects, rescaled phenotypes, and persisted fit
 results round-trip correctly on nonstandardized phenotypes with multiple
 covariates.
-
 ### Priority 2: convergence policy and the remaining performance gap
 
-Warm starts removed most redundant CG work, but the ten-replicate benchmark
-still shows evo-lmm slower than GRAPP. Profile before adding more machinery.
+#### Convergence policy — decided
 
-This section also now owns the convergence-policy work, lowered from Priority 1
-on the judgement that it can be tested later. Note what that costs: a
-deprioritized prerequisite is still a prerequisite, and
-`notes/rare_variant.md` deliberately keeps its Phase 3 gate on the convergence
-policy rather than relaxing it. Either this work gets pulled forward when the
-rare-variant reanalysis reaches Phase 3, or Phase 3 waits.
-
-### Decided: the convergence criterion and the exit taxonomy
-
-These parts of the policy are settled and implemented; the remaining open items
-below are what is *not* settled.
+The criterion, the exit taxonomy, and the `tau_c` boundary report are settled
+and implemented in both fitters. What is deliberately *not* settled is listed
+immediately after them.
 
 - **The criterion is scale-free.** Convergence is declared when
   `step_se_tol` (default `1e-2`) bounds `max_i |step_i| / SE_i`, with
@@ -496,53 +480,52 @@ below are what is *not* settled.
   only `tau_c * q_j` identified). A boundary hit does **not** change `status`
   or `converged`: a flat kernel is a legitimate estimate.
 
-Deliberately **not** decided here, and unchanged:
+Deliberately **not** decided:
 
-- Trace and CG error still gate nothing. Probes are drawn once and held fixed,
-  so the iteration converges to a stationary point of the *sketch*; the
-  sketch-to-truth distance is a bias no tolerance on the sketch can see. Neither
-  a probe-escalation stage nor a multi-seed agreement check has been adopted.
-- No decision on what a reportable estimate requires, and no validation
-  protocol: which simulations, how many replicates, and what recovery or
-  coverage counts as a pass. This is what still gates Phase 3.
+- Trace and CG error gate nothing, by decision. Probes are drawn once and held
+  fixed, so the iteration converges to a stationary point of the *sketch*; the
+  sketch-to-truth distance is a bias no tolerance on the sketch can see.
+  Neither a probe-escalation stage nor a multi-seed agreement check was
+  adopted, and no test is planned for trace-error-driven non-convergence.
+- A near-singular AI can satisfy the criterion while the Newton decrement stays
+  of order one: movement that is statistically irrelevant but an objective
+  still improving. The decrement is logged and could become a second gate; it
+  is not one.
+- Only `tau_c` boundaries are reported. A scale coordinate pinned at its
+  `+/-30` coordinate bound is not.
+- **Convergence acceptance at realistic data size was removed, deliberately.**
+  There is no requirement in this file to demonstrate convergence or recovery
+  at production `n`, and none is performed. What exists is the seeded
+  two-category convergence-and-recovery test at `n=600` on dense data, which is
+  a unit test of the criterion, not evidence about production-sized data.
+  The "failures return actionable diagnostics" half of the former gate is met
+  by the `status` taxonomy. Anyone reporting an estimate from a real-sized fit
+  is relying on the criterion's construction, not on a measured acceptance
+  result. Note that `notes/rare_variant.md` still gates its Phase 3 on the
+  convergence policy; that file is not edited from here, so the two documents
+  now disagree and the owner has to reconcile them.
 
-The stochastic defaults remain the cheap end of the range: `trace_probes=12` and
-`cg_tol=5e-4`, the latter matching GRAPP's solver budget so per-application work
-is comparable. The multi-component fitter reuses the single-component score/step
-rule, including step capping, damping escalation, and the near-convergence
-fallback — but reusing that rule is not the same as having a production
-convergence policy, and the item below stays open. One difference from the
-single-component rule is deliberate: a rejected step escalates the damping and
-continues instead of ending the fit, because the multi-component AI matrix is
-near-singular in the weakly identified `tau` directions on every real fixture
-tried.
-
-Larger probe budgets are optional verification settings. They are not a
-production rule and are not an interim substitute for a convergence policy on
-real-sized data; an earlier revision of these documents wrongly presented them
-as the route to a reportable estimate.
+The stochastic defaults remain the cheap end of the range: `trace_probes=12`
+and `cg_tol=5e-4`, the latter matching GRAPP's solver budget so per-application
+work is comparable. Larger probe budgets are optional verification settings,
+not a production rule. Both fitters share the step rule — step capping,
+Levenberg damping, and the near-convergence fallback — with one deliberate
+difference: in the multi-component fitter a rejected step escalates the damping
+and continues rather than ending the fit, because its AI matrix is near-singular
+in the weakly identified `tau` directions on every fixture tried.
 
 The documentation benchmark intentionally caps optimization at eight iterations
 and reports secant/convergence warnings from the comparison path. That setup is
-useful for timing and is not a convergence policy.
+useful for timing and says nothing about convergence.
 
-- [ ] Define and test production-scale convergence acceptance independently of
-  the matched-budget benchmark. A historical unit test used an effectively
-  unconditional tolerance and has been deleted; it provided no convergence
-  evidence. The criterion and the exit taxonomy are now decided (see
-  "Decided" above) and the fitters agree on both; what remains is the
-  acceptance experiment — which simulations, how many persisted replicates,
-  and what recovery or coverage counts as a pass — plus a decision on whether
-  the sketch-to-truth bias is addressed by probe escalation or by multi-seed
-  agreement. Note also that a near-singular AI can satisfy the step/standard-
-  error criterion while the Newton decrement stays of order one: movement that
-  is statistically irrelevant but an objective still improving. The decrement
-  is logged and could become a second gate; it is not one today.
-  A scale coordinate pinned at its `+/-30` coordinate bound is still not
-  reported — only `tau_c` boundaries are.
-- [ ] Add explicit tests for trace-error-driven non-convergence and any retry or
-  probe-budget escalation policy. These remain deferred because the chosen
-  policy keeps the sketch tolerance and does not add automatic refinement.
+Acceptance gate, convergence: removed by decision — see the last bullet under
+"Deliberately not decided" above. Nothing here requires convergence evidence at
+realistic data size.
+
+#### Performance
+
+Warm starts removed most redundant CG work, but the ten-replicate benchmark
+still shows evo-lmm slower than GRAPP. Profile before adding more machinery.
 
 - [ ] Attribute remaining time to GRG traversals, derivative construction,
   trace queries, Python orchestration, LOCO setup, and optimizer evaluations.
@@ -553,33 +536,20 @@ useful for timing and is not a convergence policy.
 - [ ] Re-evaluate Hutchinson probe count using end-to-end estimate error and
   convergence, not trace microbenchmarks alone.
 - [ ] Split stochastic REML into two trace-precision stages (deferred; not part
-  of the retained convergence rule):
-  - a **sketch stage** uses a small configurable probe budget for the first
-    coarse AI-REML steps, where accurate scores are unnecessary;
-  - a **refinement stage** switches to a larger configurable probe budget
-    before convergence can be declared and uses that budget for final scores,
-    uncertainty diagnostics, and reported estimates;
-  - make the refinement probes a deterministic superset of the sketch probes
-    so the switch adds information without discarding the common random
-    numbers already used by the optimizer;
-  - define the transition using optimization state (for example, a bounded
-    step/score threshold) with a maximum sketch-iteration fallback, rather
-    than relying only on a fixed iteration number;
-  - reset or revalidate CG warm-start caches at the transition and record the
-    stage, probe counts, transition iteration, and operator-query counts in
-    diagnostics;
-  - test that final convergence and estimates are judged only at refinement
-    precision, including cases where the sketch-stage score appears to have
-    converged by chance.
-  Deferred from the current target: the retained sketch budget is the selected
-  convergence budget, so this item is a future cost/precision experiment.
+  of the retained convergence rule, and a cost/precision experiment rather than
+  a correctness item). If it is ever built: a small sketch budget for the
+  coarse steps and a larger refinement budget before convergence may be
+  declared; refinement probes a deterministic superset of the sketch probes, so
+  the switch adds information without discarding the optimizer's common random
+  numbers; the transition driven by optimization state with a
+  maximum-sketch-iteration fallback rather than a fixed iteration; CG
+  warm-start caches revalidated at the transition; stage, probe counts,
+  transition iteration, and operator-query counts recorded in diagnostics; and
+  convergence judged only at refinement precision, including when the sketch
+  stage appears converged by chance.
 - [ ] Consider a changing-kernel Nyström preconditioner only if CG again becomes
   the dominant measured cost. Include sketch construction and refresh time in
   the comparison.
-
-Acceptance gate, convergence: default CPU fits converge reliably on
-representative simplified simulations, and failures return actionable
-diagnostics rather than plausible-looking estimates.
 
 Acceptance gate, performance: report end-to-end time, estimate changes,
 convergence status, and operator-equivalent work over multiple persisted
@@ -636,23 +606,23 @@ uv run sphinx-build -W -b html docs docs/_build/html
 
 At the last audit `uv run pytest -q` collected 69 tests and all 69 passed on
 darwin/arm64, including the `large` markers.
-`test_large_grg_matrix_free_fit_matches_dense_parameter_oracle` has been
-reported to fail on aarch64 Linux with a stochastic-tolerance mismatch in the
-matrix-free versus dense kernel comparison; it passes here, so that report is
-unconfirmed on this machine and belongs to the Priority 2 convergence-policy
-item. The documented `sphinx-build` command cannot run in the current
-environment: `docs/conf.py` loads the `sphinx_design` extension, which is not
-in the `dev` dependency group. That is a pre-existing dependency gap, not a
-docs error. Generated simulation artifacts remain ignored under
-`docs/_artifacts/`.
+`test_large_grg_matrix_free_fit_matches_dense_parameter_oracle` was once
+reported to fail on aarch64 Linux with a stochastic-tolerance mismatch; it
+passes here, so that report is unconfirmed on this machine. The
+`sphinx-build` command cannot run in this environment: `docs/conf.py` loads the
+`sphinx_design` extension, which is not in the `dev` dependency group — a
+pre-existing dependency gap, not a docs error. Generated simulation artifacts
+remain ignored under `docs/_artifacts/`.
 
 ## Definition of the next milestone
 
 The next milestone is not another covariance-kernel prototype. It is a
 calibrated, end-to-end CPU analysis path in which:
 
-1. simplified evolutionary fits converge with clear diagnostics
-   (open: Priority 2);
+1. simplified evolutionary fits converge with clear diagnostics — the
+   criterion and the `status`/boundary diagnostics are implemented
+   (Priority 2, "Convergence policy — decided"); convergence at realistic data
+   size is not demonstrated and, by decision, is not required here;
 2. LOCO association uses the fitted evolutionary covariance and independent
    BOLT-normalized test columns (done);
 3. null calibration and dense/GRG equivalence tests pass (done);
