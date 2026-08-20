@@ -44,6 +44,7 @@ from .multicomponent import (
     MultiComponentOps,
     MultiComponentPrior,
     fit_multicomponent_reml,
+    profiled_reml_objective,
 )
 from .baselines import (
     CollapsedVariants,
@@ -67,6 +68,8 @@ from .reporting import (
     gene_component_report,
     fit_genes,
     fit_report,
+    fit_tau_profiles,
+    fit_parameter_profiles,
     profile_tau,
 )
 
@@ -113,6 +116,7 @@ __all__ = [
     "MultiComponentOps",
     "MultiComponentPrior",
     "fit_multicomponent_reml",
+    "profiled_reml_objective",
     "CollapsedVariants",
     "MoMResult",
     "collapse_mac",
@@ -132,5 +136,7 @@ __all__ = [
     "gene_component_report",
     "fit_genes",
     "fit_report",
+    "fit_tau_profiles",
+    "fit_parameter_profiles",
     "profile_tau",
 ]

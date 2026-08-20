@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
+from scipy.optimize import minimize_scalar
 
 from .multicomponent import MultiComponentOps, MultiComponentPrior
 from .priors import SimplifiedPrior
@@ -184,18 +185,34 @@ def fit_rare_effect_baseline(
     at the ``tau=0`` boundary.  The joint adjustment is then computed from the
     partitioned moment system; no evolutionary weighting is introduced.
     """
-    from .reml import fit_reml
-
     marginal = []
     marginal_mom = []
     flat = flat_prior(ops.labels)
     for label in ops.labels:
-        fit = fit_reml(ops.components[label], y,
-                       initial=SimplifiedPrior(1.0, 0.0), exact=True,
-                       max_iter=max_iter)
-        marginal.append(fit.sigma_b2)
         component = ops.components[label]
-        kernel = component.dense_kernel(SimplifiedPrior(1.0, 0.0))
+        component_prior = SimplifiedPrior(1.0, 0.0)
+        kernel = component.dense_kernel(component_prior)
+        basis = component.basis
+        values = np.asarray(y, dtype=np.float64)
+        dimension = component.dim
+
+        def objective(log_delta: float) -> float:
+            delta = float(np.exp(log_delta))
+            shape = kernel + delta * np.eye(component.n)
+            from .reml import _dense_projection
+            ph, inv_shape, logdet = _dense_projection(shape, basis)
+            q = float(values @ ph @ values)
+            fixed = basis.T @ inv_shape @ basis
+            return float(0.5 * (logdet + np.linalg.slogdet(fixed)[1] + dimension * np.log(q / dimension)))
+
+        optimum = minimize_scalar(objective, bounds=(-30.0, 30.0), method="bounded",
+                                  options={"xatol": 1e-10})
+        delta = float(np.exp(optimum.x))
+        shape = kernel + delta * np.eye(component.n)
+        from .reml import _dense_projection
+        ph, _inv_shape, _logdet = _dense_projection(shape, basis)
+        sigma_b2 = float(values @ ph @ values / dimension)
+        marginal.append(sigma_b2)
         projected = component.project(np.asarray(y, dtype=np.float64))
         trace = float(np.trace(kernel))
         system = np.array([[float(np.trace(kernel @ kernel)), trace], [trace, component.dim]])

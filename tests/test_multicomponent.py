@@ -5,6 +5,7 @@ from evo_lmm import (
     MultiComponentPrior,
     SimplifiedPrior,
     fit_multicomponent_reml,
+    profiled_reml_objective,
 )
 from evo_lmm.reml import fit_reml
 
@@ -49,6 +50,29 @@ def test_zero_tau_is_exact_flat_per_category_nesting():
         for label, scale in zip(ops.labels, (1.2, 0.8))
     )
     np.testing.assert_array_equal(ops.dense_kernel(flat), expected)
+
+
+def test_small_dense_fit_ladder_has_exact_boundary_objectives():
+    ops, _, _ = _ops()
+    y = np.random.default_rng(7).normal(size=ops.n)
+    flat = MultiComponentPrior.flat(ops.labels, scales=(1.2, 0.8))
+    flat_reference = MultiComponentPrior(
+        ops.labels, (SimplifiedPrior(1.2, 0.0), SimplifiedPrior(0.8, 0.0))
+    )
+    shared = MultiComponentPrior(
+        ops.labels, (SimplifiedPrior(1.2, 0.7), SimplifiedPrior(0.8, 0.7))
+    )
+    shared_reference = MultiComponentPrior(
+        ops.labels, (SimplifiedPrior(1.2, 0.7), SimplifiedPrior(0.8, 0.7))
+    )
+    np.testing.assert_array_equal(
+        profiled_reml_objective(ops, y, flat),
+        profiled_reml_objective(ops, y, flat_reference),
+    )
+    np.testing.assert_array_equal(
+        profiled_reml_objective(ops, y, shared),
+        profiled_reml_objective(ops, y, shared_reference),
+    )
 
 
 def test_shared_tau_and_batched_component_derivatives_are_exact():

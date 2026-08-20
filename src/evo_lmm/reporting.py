@@ -23,7 +23,7 @@ class HeritabilityEstimates:
 
 @dataclass(frozen=True)
 class ProfileLikelihood:
-    """One-dimensional profile likelihood for a non-negative ``tau_c``."""
+    """One-dimensional profile likelihood on a scientific parameter scale."""
 
     tau: np.ndarray
     objective: np.ndarray
@@ -48,6 +48,7 @@ class FitReport:
     heritability_se: float
     component_standard_errors: dict[str, float]
     maf_decomposition: dict[Any, np.ndarray] | None
+    tau_profiles: dict[Any, ProfileLikelihood] | None = None
 
 
 def profile_tau(
@@ -93,7 +94,75 @@ def fit_report(
     decomposition = None if maf_bins is None else genic_variance_by_maf(
         fit.ops, fit.prior, maf_bins
     )
-    return FitReport(estimates, h2_se, fit.standard_errors or {}, decomposition)
+    component_errors: dict[str, float] = {}
+    for index, label in enumerate(fit.ops.labels):
+        if fit.standard_errors:
+            component_errors[f"sigma_b2[{label}]"] = fit.prior.components[index].sigma_b2 * fit.standard_errors.get(
+                f"log_sigma_b2[{label}]", float("nan")
+            )
+            component_errors[f"tau[{label}]"] = fit.prior.components[index].tau * fit.standard_errors.get(
+                f"log_tau[{label}]", float("nan")
+            )
+    return FitReport(estimates, h2_se, component_errors, decomposition)
+
+
+def fit_tau_profiles(
+    fit: MultiComponentFit, tau_grids: dict[Any, Sequence[float]]
+) -> dict[Any, ProfileLikelihood]:
+    """Profile each category's ``tau_c`` with other fitted parameters fixed."""
+    from .multicomponent import profiled_reml_objective
+
+    profiles: dict[Any, ProfileLikelihood] = {}
+    for label, grid in tau_grids.items():
+        if label not in fit.ops.labels:
+            raise KeyError(label)
+        index = fit.ops.labels.index(label)
+
+        def objective(tau: float) -> float:
+            components = list(fit.prior.components)
+            components[index] = SimplifiedPrior(components[index].sigma_b2, tau)
+            prior = MultiComponentPrior(fit.ops.labels, tuple(components))
+            if fit.phenotype is None:
+                raise ValueError("fit does not retain a phenotype for profiling")
+            return profiled_reml_objective(fit.ops, fit.phenotype, prior)[0]
+
+        profiles[label] = profile_tau(grid, objective)
+    return profiles
+
+
+def fit_parameter_profiles(
+    fit: MultiComponentFit, parameter_grids: dict[str, Sequence[float]]
+) -> dict[str, ProfileLikelihood]:
+    """Profile scientific-scale ``sigma_b2[label]`` and ``tau[label]`` grids."""
+    from .multicomponent import profiled_reml_objective
+
+    profiles: dict[str, ProfileLikelihood] = {}
+    for name, grid in parameter_grids.items():
+        try:
+            parameter, raw_label = name.split("[", 1)
+            label = raw_label[:-1]
+            index = fit.ops.labels.index(label)
+        except (ValueError, IndexError):
+            raise KeyError(name) from None
+        if parameter not in ("sigma_b2", "tau"):
+            raise KeyError(name)
+
+        def objective(value: float) -> float:
+            if value <= 0.0 and parameter == "sigma_b2":
+                return float("inf")
+            components = list(fit.prior.components)
+            current = components[index]
+            components[index] = SimplifiedPrior(
+                value if parameter == "sigma_b2" else current.sigma_b2,
+                value if parameter == "tau" else current.tau,
+            )
+            prior = MultiComponentPrior(fit.ops.labels, tuple(components))
+            if fit.phenotype is None:
+                raise ValueError("fit does not retain a phenotype for profiling")
+            return profiled_reml_objective(fit.ops, fit.phenotype, prior)[0]
+
+        profiles[name] = profile_tau(grid, objective)
+    return profiles
 
 
 def fit_genes(

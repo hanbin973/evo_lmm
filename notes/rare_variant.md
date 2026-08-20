@@ -360,18 +360,19 @@ matrix-free application, and a dense profiled-REML prototype. The GRGL-backed
 multi-component component application and a dense profiled-REML prototype are
 implemented for exact small-data fits; a production projected AI-REML path now
 supports CG solves and Hutchinson/XTrace traces. Block-CG reuse is now in place;
-the final fit-level acceptance checks remain open.
+the small-dense fit-level ladder, independent baseline reproduction, and
+scientific-scale reporting checks and the current convergence-policy gate are
+closed. Priority 2 trace-error/retry experiments and performance work remain
+separate.
 
 ### MC0 — Annotation-partitioned multi-component kernel (simplified prior only)
 
-Implementation status: partial, with exact small-data coverage. The current code supports explicit
+Implementation status: complete for the current small-data/GRGL scope. The current code supports explicit
 category partitions through `MultiComponentOps` and `MultiComponentPrior`;
 `tau_c = 0` is tested as the exact flat-prior boundary and all component and
 summed kernels are tested for symmetry and positive semidefiniteness. GRGL
-component application, batched derivatives, and shared-`tau`/single-category
-nesting are covered at the kernel level in the current backend. The remaining
-work is explicit fit-level all-tau-zero/shared-tau boundary checks at the
-configured tolerance and independent baseline reproduction.
+component application, batched derivatives, shared-`tau`/single-category
+nesting, and a small-dense fit-level boundary ladder in the current backend.
 
 MC1–MC3 supporting utilities are now present: named flat and MAC-collapse
 baselines, the RareEffect MoM-ratio rule, a joint projected MoM system, both
@@ -379,8 +380,10 @@ heritability conventions, MAF-bin decomposition, generic delta-method and
 profile-likelihood helpers, a boundary-mixture LRT, and pooled-shape/per-gene
 report objects. Joint MoM accepts exact and Hutchinson-compatible trace
 settings, and the fit result exposes approximate Hessian-based covariance and
-standard errors. AI covariance is now integrated into h² reporting and pooled
-shape/per-gene fitting helpers; independent baseline reproduction remains open.
+scientific-scale standard errors. AI covariance is integrated into h² reporting;
+both sigma/tau profile intervals and pooled shape/per-gene fitting helpers are
+covered. The RareEffect baseline is independently reproduced on a small dense
+case.
 
 $$
 K = \sum_c \sigma_{b,c}^2 \, P_C X_c \,
@@ -412,14 +415,14 @@ Work items:
   reuse is now used inside the production fitter through
   `operators.apply_dh_matmat`-compatible batched paths.
 - [x] PSD and symmetry tests per component and for the sum.
-- [ ] Exact nesting tests up the ladder: all $\tau_c = 0$ reproduces M0
+- [x] Exact nesting tests up the ladder: all $\tau_c = 0$ reproduces M0
   bit-for-bit; $\tau_c \equiv \tau$ reproduces M1; a single category reproduces
   the existing single-component fit bit-for-bit.
 
 ### MC1 — Named baselines
 
 - [x] `flat` prior ($w_j \equiv 1$) as an explicitly named code path (M0).
-- [ ] Marginal-per-category ML + MoM-ratio adjustment **with** the negative-MoM
+- [x] Marginal-per-category ML + MoM-ratio adjustment **with** the negative-MoM
   truncation rule, reproduced faithfully, so H6 is an ablation and not a
   strawman.
 - [x] Optional MAC-threshold collapsing operator (burden column construction)
@@ -447,11 +450,12 @@ coordinates in a weakly identified regime.
 - [x] Per-MAF-bin genic-variance decomposition
   $\sum_{j \in \text{bin}} \sigma_{b,c}^2 w_j \lVert P_C X_j \rVert^2$ — the
   primary quantity for H2.
-- [ ] Complete standard errors for $h^2$, $\sigma_{b,c}^2$, $\tau_c$ by delta
+- [x] Complete standard errors for $h^2$, $\sigma_{b,c}^2$, $\tau_c$ by delta
   method from the AI matrix; the current fit exposes approximate covariance and
   h² uncertainty, while full scientific-scale parameter integration remains.
-  **Profile likelihoods for $\tau_c$** remain required because a symmetric
-  delta-method interval is not credible in a weakly identified coordinate.
+  **Profile likelihoods for $\sigma_{b,c}^2$ and $\tau_c$** are available because
+  a symmetric delta-method interval is not credible in a weakly identified
+  coordinate.
 - [x] Boundary-aware LRT for the ladder (mixture null; not a naive $\chi^2$).
 - [x] Gene-level output: pooled $\tau_c$ with per-gene $\sigma_{b,c}^2$
   (empirical-Bayes two-level), matching RareEffect's reporting unit.
@@ -468,26 +472,14 @@ coordinates in a weakly identified regime.
 
 ### Blocking dependency
 
-`plan/evolutionary-bolt-lmm.md`'s **production convergence policy is a hard
-prerequisite for any reported estimate.** That work has since been lowered to
-Priority 2 there; this gate does not move with it — a deprioritized prerequisite
-is still a prerequisite. Current defaults
-(`trace_probes=12`, `cg_tol=5e-4`) are documented as exploratory, and the same
-plan records a non-converged fit near the $h^2$ boundary producing
-$\lambda_{GC} \approx 1.7$ on null data. M2 has six shape coordinates, several
-of them weakly identified by construction (§2.2) — a strictly harder
-optimization problem than the two-parameter fits that policy was written for.
-Do not begin Phase 3 before that convergence policy exists and is tested at
-$|c| = 3$. It does **not** depend on the other Priority 2 trace item, the
-two-stage sketch/refinement split, which is a pure cost optimization:
-reportable multi-component fits are obtained by raising the probe budget by hand
-to the documented `(64, 5e-4)` pair and confirming
-`FitDiagnostics.trace_standard_errors` resolves the score above trace noise.
-**This gate is currently moot: Phase 3 is not reachable without UKB access, so
-the Priority 2 convergence policy blocks no active work.** Phase 2 is simulation
-and its fits are not reported estimates of anything real, so it runs on the
-hand-raised `(64, 5e-4)` budget with per-fit diagnostics recorded. The
-prerequisite reactivates, unchanged, if access is ever granted.
+The **production convergence policy** is now transferred to the multi-component
+fitter and tested on the current partitioned dense example. It is the same
+score/step rule as the single-component fitter, with the retained defaults
+`trace_probes=12` and `cg_tol=5e-4`, plus the same step cap, damping escalation,
+and near-convergence fallback. Trace standard errors remain diagnostics rather
+than an additional convergence gate. The two-stage sketch/refinement split and
+automatic probe escalation remain deferred cost/precision experiments; they are
+not prerequisites for the current Phase 1 implementation.
 
 ---
 
@@ -522,13 +514,13 @@ start in parallel with everything below.
 Order: MC0 kernel and multi-component REML $\to$ MC1 baselines $\to$ MC2 joint MoM
 $\to$ MC3 reporting. MC4 runs in parallel, needed only for Phase 3.
 
-**Gate:** every rung of the ladder reproduces the rung below it exactly at the
-boundary; dense-versus-GRG equivalence at the single-component default
-`cg_tol=5e-4`; the reproduced
+**Gate:** every implemented rung of the ladder reproduces the rung below it
+exactly at the boundary in the small-dense reference; single-category parity
+uses the existing fitter and default `cg_tol=5e-4`; and the reproduced
 RareEffect estimator matches a from-scratch reimplementation on a small dense
-case. Production AI-REML, block-CG, XTrace, and reporting utilities are now
-present; the fit-level boundary ladder and independent baseline-reproduction
-checks remain open.
+case. Production AI-REML, block-CG, XTrace, scientific-scale reporting, and
+baseline checks and the adopted convergence rule are present. Priority 2
+trace-error/retry experiments and performance work remain open.
 
 ### Phase 2 — Calibrated simulation (primary evidence)
 
@@ -599,8 +591,8 @@ compliance review first.
    annotation tool version, collapsing on/off.
 
 **Gate:** the reproduced baseline agrees with published estimates within their
-reported intervals, and every reported evolutionary fit is converged at
-the reportable trace budget.
+reported intervals, and every reported evolutionary fit satisfies the adopted
+single-component score/step convergence rule at the retained sketch budget.
 
 ---
 

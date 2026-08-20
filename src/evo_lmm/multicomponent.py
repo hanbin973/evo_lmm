@@ -256,6 +256,30 @@ class MultiComponentFit:
     cg_tol: float = float("nan")
     score_norm: float = float("nan")
     trace_standard_error: float = float("nan")
+    phenotype: np.ndarray | None = None
+    accepted_step: float = float("nan")
+    ai_damping: float = float("nan")
+
+
+def profiled_reml_objective(
+    ops: MultiComponentOps, y: np.ndarray, prior: MultiComponentPrior
+) -> tuple[float, float]:
+    """Evaluate the exact dense profiled-REML objective for a fixed prior.
+
+    Returns ``(objective, sigma_e2)`` for ``V = sigma_e2 * (I + K)``.  This is
+    the small-dense reference used to verify the M0/M1/M2 nesting ladder.
+    """
+    values = np.asarray(y, dtype=np.float64)
+    if values.shape != (ops.n,) or not np.all(np.isfinite(values)):
+        raise ValueError("y must be a finite vector with shape (n,)")
+    shape = np.eye(ops.n) + ops.dense_kernel(prior)
+    ph, inv_shape, logdet = _dense_projection(shape, ops.basis)
+    q = float(values @ ph @ values)
+    if q <= 0.0:
+        raise np.linalg.LinAlgError("profiled REML quadratic form is non-positive")
+    fixed = ops.basis.T @ inv_shape @ ops.basis
+    objective = 0.5 * (logdet + np.linalg.slogdet(fixed)[1] + ops.dim * np.log(q / ops.dim))
+    return float(objective), float(q / ops.dim)
 
 
 def fit_multicomponent_reml(
@@ -269,6 +293,8 @@ def fit_multicomponent_reml(
     trace_probes: int = 12,
     seed: int = 0,
     cg_tol: float = 5e-4,
+    tol: float = 1e-6,
+    max_step: float = 2.0,
 ) -> MultiComponentFit:
     """Fit by exact profiled REML.
 
@@ -281,8 +307,8 @@ def fit_multicomponent_reml(
         raise ValueError("method must be 'ai' or 'dense'")
     if trace_method not in ("hutchinson", "xtrace"):
         raise ValueError("trace_method must be 'hutchinson' or 'xtrace'")
-    if trace_probes < 2 or cg_tol <= 0:
-        raise ValueError("trace_probes must be at least two and cg_tol positive")
+    if trace_probes < 2 or cg_tol <= 0 or tol <= 0 or max_step <= 0:
+        raise ValueError("trace_probes must be at least two; tolerances and max_step must be positive")
     values = np.asarray(y, dtype=np.float64)
     if values.shape != (ops.n,) or not np.all(np.isfinite(values)):
         raise ValueError("y must be a finite vector with one entry per individual")
@@ -298,7 +324,8 @@ def fit_multicomponent_reml(
     if method == "ai" and ops.n_components > 1:
         return _fit_multicomponent_ai(
             ops, values, prior, max_iter=max_iter, trace_method=trace_method,
-            trace_probes=trace_probes, seed=seed, cg_tol=cg_tol,
+            trace_probes=trace_probes, seed=seed, cg_tol=cg_tol, tol=tol,
+            max_step=max_step,
         )
 
     # The one-category model is exactly the existing single-component model;
@@ -312,7 +339,8 @@ def fit_multicomponent_reml(
         return MultiComponentFit(fitted, single.sigma_e2, single.h2, single.diagnostics.objective,
                                  single.diagnostics.converged, ops,
                                  trace_method=trace_method, trace_probes=trace_probes,
-                                 cg_tol=cg_tol, score_norm=single.diagnostics.score_norm)
+                                 cg_tol=cg_tol, score_norm=single.diagnostics.score_norm,
+                                 phenotype=values.copy())
     coordinates = prior.coordinates.copy()
     finite = np.isfinite(coordinates)
     coordinates[~finite] = np.log(np.finfo(float).tiny)
@@ -350,7 +378,8 @@ def fit_multicomponent_reml(
         except (AttributeError, ValueError):
             covariance = None
     return MultiComponentFit(fitted, sigma_e2, h2, objective, bool(result.success), ops,
-                             covariance, standard_errors, trace_method, trace_probes, cg_tol)
+                             covariance, standard_errors, trace_method, trace_probes, cg_tol,
+                             phenotype=values.copy())
 
 
 def _fit_multicomponent_ai(
@@ -363,6 +392,8 @@ def _fit_multicomponent_ai(
     trace_probes: int,
     seed: int,
     cg_tol: float,
+    tol: float,
+    max_step: float,
 ) -> MultiComponentFit:
     """Projected AI-REML with profiled residual scale and batched probes."""
     coords = initial.coordinates.copy()
@@ -377,6 +408,8 @@ def _fit_multicomponent_ai(
     last_sigma_e2 = np.nan
     last_prior = initial
     last_score = np.full(len(names), np.nan)
+    last_step = 0.0
+    damping = 0.0
 
     def derivative_trace(name: str, prior: MultiComponentPrior, vectors: np.ndarray) -> float:
         def apply(values: np.ndarray) -> np.ndarray:
@@ -436,7 +469,7 @@ def _fit_multicomponent_ai(
         result = target - correction
         return result[:, 0] if was_vector else result
 
-    for _iteration in range(int(max_iter)):
+    for iteration in range(1, int(max_iter) + 1):
         prior = MultiComponentPrior.from_coordinates(ops.labels, coords)
         rhs = np.column_stack((y, probes))
         solved = projected_solve(rhs, prior)
@@ -456,6 +489,13 @@ def _fit_multicomponent_ai(
             data[index] = float(ph_y @ applied_y)
             trace = derivative_trace(name, prior, probes)
             score[index] = 0.5 * (data[index] - trace)
+        score_norm = float(np.linalg.norm(score, ord=np.inf))
+        if score_norm <= tol and (last_step <= tol or iteration > 1):
+            converged = True
+            last_score = score
+            last_prior = prior
+            last_sigma_e2 = q / ops.dim
+            break
         direct = np.empty((len(names), len(names)), dtype=np.float64)
         for i in range(len(names)):
             for j in range(len(names)):
@@ -465,10 +505,17 @@ def _fit_multicomponent_ai(
                 direct[i, j] = 0.5 * float(value[0])
         ai = (direct - np.outer(data, data) / (2.0 * q)) / max(q / ops.dim, np.finfo(float).tiny)
         ai = (ai + ai.T) * 0.5
-        damping = max(1e-8, 1e-6 * np.trace(np.abs(ai)) / max(len(names), 1))
-        step = np.linalg.solve(ai + damping * np.eye(len(names)), score)
-        step = np.clip(step, -1.0, 1.0)
-        old_norm = float(np.linalg.norm(score))
+        if not np.all(np.isfinite(ai)) or np.linalg.cond(ai) > 1e12:
+            damping = max(damping, 1e-8 * max(float(np.trace(np.abs(ai))) / max(len(names), 1), 1.0))
+        trial_ai = ai + damping * np.eye(len(names))
+        try:
+            step = np.linalg.solve(trial_ai, score)
+        except np.linalg.LinAlgError:
+            step = np.linalg.lstsq(trial_ai, score, rcond=None)[0]
+        step_norm = float(np.max(np.abs(step))) if step.size else 0.0
+        if step_norm > max_step:
+            step *= max_step / step_norm
+        old_norm = float(np.linalg.norm(score / np.sqrt(np.maximum(np.diag(trial_ai), 1e-12))))
         accepted = False
         for halving in range(10):
             trial_coords = np.clip(coords + step * (0.5 ** halving), -30.0, 30.0)
@@ -480,19 +527,23 @@ def _fit_multicomponent_ai(
             for name in names:
                 trial_score.append(0.5 * (trial_ph_y @ trial_values[name][:, 0]
                                           - derivative_trace(name, trial_prior, probes)))
-            if np.linalg.norm(trial_score) <= old_norm:
+            new_norm = float(np.linalg.norm(np.asarray(trial_score) /
+                                            np.sqrt(np.maximum(np.diag(trial_ai), 1e-12))))
+            if new_norm <= old_norm or np.max(np.abs(step)) * (0.5 ** halving) <= tol:
                 coords = trial_coords
                 accepted = True
+                last_step = float(np.max(np.abs(step)) * (0.5 ** halving))
                 break
         if not accepted:
+            last_step = 0.0
+            damping = max(1e-6, damping * 10.0 if damping else 1e-6)
+            if score_norm <= 10.0 * tol:
+                converged = True
             break
         last_score = score
         last_prior = prior
         last_sigma_e2 = q / ops.dim
         covariance = np.linalg.pinv(ai + damping * np.eye(len(names)))
-        if np.linalg.norm(score, ord=np.inf) < 1e-5:
-            converged = True
-            break
 
     fitted = MultiComponentPrior(
         ops.labels,
@@ -511,4 +562,8 @@ def _fit_multicomponent_ai(
         fitted, last_sigma_e2, h2, objective, converged, ops, covariance, errors,
         trace_method, trace_probes, cg_tol,
         float(np.linalg.norm(last_score, ord=np.inf)),
+        float("nan"),
+        y.copy(),
+        last_step,
+        damping,
     )

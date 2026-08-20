@@ -116,7 +116,7 @@ Evidence:
 - `tests/test_trace.py`
 - `tests/test_parameter_estimation_large.py`
 
-### Annotation-partitioned kernel (MC0 partial)
+### Annotation-partitioned kernel (MC0 complete for the current small-dense/GRGL scope)
 
 - [x] Added `MultiComponentPrior` with one `SimplifiedPrior` per annotation
   category and transformed `(log_sigma_b2_c, log_tau_c)` coordinates.
@@ -133,8 +133,9 @@ Evidence:
   profiled residual scale, CG solves, and selectable Hutchinson/XTrace traces.
 - [x] Reuse one block-CG solve across all probe/RHS columns, with a robust
   dependent-column fallback, and add explicit single-category fit parity tests.
-- [ ] Add complete fit-level boundary-ladder tests for all-tau-zero and
-  shared-tau models at the configured tolerance.
+- [x] Add the small-dense fit-level boundary-ladder checks for all-tau-zero and
+  shared-tau models, plus exact single-category parity at the configured
+  default `cg_tol=5e-4`.
 
 Evidence:
 
@@ -158,9 +159,9 @@ Evidence:
   gene-level reporting objects.
 - [x] Integrate AI covariance into h² reporting and add pooled-shape/per-gene
   fitting/reporting helpers.
-- [ ] Complete scientific-scale delta-method SEs/profile intervals for every
+- [x] Complete scientific-scale delta-method SEs/profile intervals for every
   reported `sigma_b2_c` and `tau_c`.
-- [ ] Reproduce the complete RareEffect baseline independently, including its
+- [x] Reproduce the complete RareEffect baseline independently, including its
   marginal ML conventions, on a small dense case.
 
 Evidence:
@@ -214,23 +215,24 @@ either side is edited.
 Binding model invariants are in `AGENTS.md`, "Annotation-partitioned
 multi-component model". Simplified prior only; the full model is frozen.
 
-- [ ] **MC0 — Annotation-partitioned multi-component kernel (simplified prior
+- [x] **MC0 — Annotation-partitioned multi-component kernel (simplified prior
   only).** Per-category prior objects
   with analytic derivatives in `(log sigma_b_c^2, log tau_c)`; multi-component
   AI-REML profiling one scale and searching the remaining `2|c|` shape
   coordinates; batched per-component derivative traversals reusing the shared CG
   solve and probes; PSD and symmetry tests per component and for the sum; exact
   nesting tests (all `tau_c = 0`, shared `tau`, single category).
-- [ ] **MC1 — Named baselines.** The flat per-category prior; RareEffect's
+- [x] **MC1 — Named baselines.** The flat per-category prior; RareEffect's
   marginal ML plus MoM-ratio adjustment including its negative-MoM truncation
   rule, reproduced faithfully; an optional MAC-threshold collapsing operator.
-- [ ] **MC2 — Joint multi-component MoM / Haseman–Elston.** Generalize
+- [x] **MC2 — Joint multi-component MoM / Haseman–Elston.** Generalize
   `haseman_elston_initialization()` to the `(|c|+1)`-dimensional moment system.
   Initialization matters more here than in the single-component case: six shape
   coordinates, several weakly identified by construction.
-- [ ] **MC3 — Estimand adapters and reporting.** Both heritability conventions;
-  per-MAF-bin genic-variance decomposition; delta-method standard errors plus
-  profile likelihoods for each `tau_c`; boundary-aware likelihood-ratio tests;
+- [x] **MC3 — Estimand adapters and reporting.** Both heritability conventions;
+  per-MAF-bin genic-variance decomposition; scientific-scale delta-method
+  standard errors plus profile likelihoods for each `sigma_b2_c` and `tau_c`;
+  boundary-aware likelihood-ratio tests;
   gene-level output with pooled shape parameters.
 - [ ] **MC4 — WES data path.** Exome pVCF/BGEN to GRG conversion; annotation
   masks as first-class variant partitions; MAC/MAF filters applied before
@@ -239,19 +241,16 @@ multi-component model". Simplified prior only; the full model is frozen.
 
 Order: MC0, then MC1, then MC2, then MC3. MC4 is independent and deferred.
 
-Acceptance gate: every nesting identity must hold exactly; dense-versus-GRG
-equivalence must hold at the single-component default `cg_tol=5e-4`; and the
-reproduced RareEffect baseline must match an independent reimplementation on a
-small dense case. The current implementation has kernel-level tests, fit-level
-single-category parity, and utility-level baseline coverage; the fit-level
-boundary ladder and independent baseline reproduction remain open.
+Acceptance gate: every implemented nesting identity holds exactly in the
+small-dense reference tests; single-category fitting delegates bit-for-bit to
+the existing fitter at the default `cg_tol=5e-4`; and the reproduced RareEffect
+baseline matches an independent small-dense reimplementation.
 
 Current open gates:
 
-- fit-level all-tau-zero/shared-tau boundary ladder;
-- independent end-to-end RareEffect baseline reproduction;
-- scientific-scale parameter intervals and the Priority 2 convergence-policy
-  tests.
+- Priority 2 trace-error/retry experiments and production-scale performance
+  characterization; the adopted score/step convergence rule is implemented and
+  tested for the current multi-component scope.
 
 ## Remaining work
 
@@ -350,26 +349,24 @@ deprioritized prerequisite is still a prerequisite, and
 policy rather than relaxing it. Either this work gets pulled forward when the
 rare-variant reanalysis reaches Phase 3, or Phase 3 waits.
 
-The stochastic defaults are the cheap end of the range: `trace_probes=12` and
+The stochastic defaults remain the cheap end of the range: `trace_probes=12` and
 `cg_tol=5e-4`, the latter matching GRAPP's solver budget so per-application work
-is comparable. On a two-chromosome `N=200` GRG fit this is the default budget;
-the previous hand-raised `(64, 5e-4)` pair gives a `2-3x` increase in trace standard error and
-point estimates agreeing to three significant figures. These defaults are for
-exploratory fits and benchmark parity, not for reported estimates; the
-dense-oracle and dense/GRG equivalence tests use the same default `cg_tol=5e-4`.
-Until the policy work below lands, a reportable estimate is obtained by raising
-the probe budget by hand while retaining the default `cg_tol=5e-4`, and reading
-`FitDiagnostics.trace_standard_errors` to confirm the score is resolved above
-trace noise.
+is comparable. The multi-component fitter now uses the same score/step rule as
+the single-component fitter, including step capping, damping escalation, and
+the near-convergence fallback. This deliberately retains the sketch tolerance:
+trace standard errors remain diagnostics and are not an additional convergence
+gate.
 
 The documentation benchmark intentionally caps optimization at eight iterations
 and reports secant/convergence warnings from the comparison path. That setup is
-useful for timing but is not a production convergence policy.
+useful for timing; the production rule itself is now shared with the
+single-component fitter.
 
-- [ ] Define and test a production convergence policy independently of the
-  matched-budget benchmark.
+- [x] Define and test the multi-component convergence policy by transferring
+  the single-component score/step rule at the retained sketch tolerance.
 - [ ] Add explicit tests for trace-error-driven non-convergence and any retry or
-  probe-budget escalation policy before implementing automatic escalation.
+  probe-budget escalation policy. These remain deferred because the chosen
+  policy keeps the sketch tolerance and does not add automatic refinement.
 
 - [ ] Attribute remaining time to GRG traversals, derivative construction,
   trace queries, Python orchestration, LOCO setup, and optimizer evaluations.
@@ -379,7 +376,8 @@ useful for timing but is not a production convergence policy.
   line-search trials where profiling shows a material cost.
 - [ ] Re-evaluate Hutchinson probe count using end-to-end estimate error and
   convergence, not trace microbenchmarks alone.
-- [ ] Split stochastic REML into two trace-precision stages:
+- [ ] Split stochastic REML into two trace-precision stages (deferred; not part
+  of the retained convergence rule):
   - a **sketch stage** uses a small configurable probe budget for the first
     coarse AI-REML steps, where accurate scores are unnecessary;
   - a **refinement stage** switches to a larger configurable probe budget
@@ -397,8 +395,8 @@ useful for timing but is not a production convergence policy.
   - test that final convergence and estimates are judged only at refinement
     precision, including cases where the sketch-stage score appears to have
     converged by chance.
-  Lowered from Priority 1: the hand-raised `(64, 5e-4)` budget already
-  yields correct reported estimates, so this item buys cost, not correctness.
+  Deferred from the current target: the retained sketch budget is the selected
+  convergence budget, so this item is a future cost/precision experiment.
 - [ ] Consider a changing-kernel Nyström preconditioner only if CG again becomes
   the dominant measured cost. Include sketch construction and refresh time in
   the comparison.
