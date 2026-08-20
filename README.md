@@ -11,9 +11,10 @@ carried out directly on
 [genotype representation graphs (GRG)](https://github.com/aprilweilab/grgl) so
 that biobank-scale genotype matrices are never materialized.
 
-The scientific specification lives in
-[the accompanying notes](notes/stab1_genetics_template.pdf), which are the source
-of truth for the model; the code follows them.
+The model is specified in Lee & Terhorst (2026),
+[*Parameterizing the genetic architecture under stabilizing selection*](https://doi.org/10.1093/genetics/iyag180)
+(author version: [`notes/stab1_genetics_template.pdf`](notes/stab1_genetics_template.pdf)).
+The paper is the source of truth; the code follows it.
 
 * **Selection-derived priors** — SNP-effect variance follows from Fisher's
   geometric model of stabilizing selection, with two nested model families.
@@ -138,7 +139,7 @@ Repository layout:
 .
 ├── grgl/         Submodule: native GRGL library and its Python package
 ├── grapp/        Submodule: reference GRGL-backed BOLT-LMM implementation
-├── notes/        Scientific specification for the evolutionary model
+├── notes/        Author version of Lee & Terhorst (2026)
 ├── plan/         Implementation plans
 ├── src/evo_lmm/  First-party evolutionary LMM package
 ├── tests/        Dense, GRG, REML, and LOCO verification
@@ -153,6 +154,7 @@ If you use `evo-lmm`, please cite the paper describing the model:
 > Lee, H., & Terhorst, J. (2026). Parameterizing the genetic architecture under
 > stabilizing selection. *Genetics*.
 > https://doi.org/10.1093/genetics/iyag180
+> ([author version](notes/stab1_genetics_template.pdf))
 
 Please also cite the GRG papers that the genotype backend rests on:
 
