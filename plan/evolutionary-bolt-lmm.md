@@ -116,25 +116,22 @@ Evidence:
 - `tests/test_trace.py`
 - `tests/test_parameter_estimation_large.py`
 
-### Annotation-partitioned kernel (MC0 complete for the current small-dense/GRGL scope)
+### Annotation-partitioned kernel (MC0 complete)
 
 - [x] Added `MultiComponentPrior` with one `SimplifiedPrior` per annotation
   category and transformed `(log_sigma_b2_c, log_tau_c)` coordinates.
 - [x] Added `MultiComponentOps` with category-specific projected kernels,
-  analytic component derivatives, PSD/symmetry coverage, and batched
-  matrix-free kernel/derivative application.
+  analytic component derivatives, and batched matrix-free kernel and derivative
+  application on both the dense and the GRGL-backed path.
 - [x] Added an exact dense profiled-REML prototype that profiles the residual
   scale and reports category-specific `sigma_b2_c`, `tau_c`, and heritability.
-- [x] Added deterministic tests for component PSD, derivative agreement, the
-  `tau_c = 0` flat-kernel boundary, and a seeded multi-component fit.
-- [x] GRGL-backed component application/materialization and shared batched
-  derivative application are available for small exact fits.
 - [x] Added production projected AI-REML with analytic component derivatives,
   profiled residual scale, CG solves, and selectable Hutchinson/XTrace traces.
 - [x] Reuse one block-CG solve across all probe/RHS columns, with a robust
-  dependent-column fallback, and add explicit single-category fit parity tests.
-- [x] Add independent dense and GRGL-backed operator boundary checks for
-  all-tau-zero and shared-tau models.
+  dependent-column fallback.
+- [x] Deterministic tests for component and summed PSD/symmetry, derivative
+  agreement, and independent dense and GRGL-backed boundary checks for the
+  all-`tau_c`-zero flat kernel and the shared-`tau` model.
 - [x] Pin the stochastic score against a finite-difference gradient of
   `profiled_reml_objective` and the stochastic average-information matrix
   against a dense oracle, both at exact traces
@@ -160,18 +157,17 @@ Evidence:
   represented explicitly in the result.
 - [x] Joint projected multi-component MoM system with raw estimates and a
   separate truncation audit.
-- [x] Both heritability conventions, per-MAF-bin genic-variance decomposition,
-  generic delta-method SEs, tau profile-likelihood evaluation, boundary-mixture
-  LRT p-values, and pooled-shape/per-gene-scale report objects.
-- [x] Added marginal baseline fitting, Hutchinson-compatible joint trace
-  estimation, fit-level Hessian covariance where available, and pooled
-  gene-level reporting objects.
-- [x] Integrate AI covariance into h² reporting and add pooled-shape/per-gene
-  fitting/reporting helpers.
-- [x] Complete scientific-scale delta-method SEs/profile intervals for every
-  reported `sigma_b2_c` and `tau_c`.
-- [x] Reproduce the complete RareEffect baseline independently, including its
-  marginal ML conventions, on a small dense case.
+- [x] Both heritability conventions and the per-MAF-bin genic-variance
+  decomposition.
+- [x] Uncertainty reporting: AI covariance carried into h² through a
+  delta-method SE, scientific-scale SEs and profile intervals for every
+  reported `sigma_b2_c` and `tau_c`, and boundary-mixture LRT p-values.
+  Profiles are evaluated on the scale the fit reports.
+- [x] Pooled-shape/per-gene reporting: `fit_genes()` conditions per-gene scales
+  on shapes held fixed across genes, and reports the shapes it conditioned on.
+- [x] Marginal baseline fitting with Hutchinson-compatible joint trace
+  estimation, reproduced against an independent error-contrast implementation
+  on a small dense case.
 
 Evidence:
 
@@ -204,6 +200,13 @@ Evidence:
 - [x] Ten-replicate runtime aggregation.
 - [x] Sequential profiles for cold/warm CG, Hutchinson, XTrace, and reduced
   probe counts.
+- [x] Ten-replicate multi-component forward-simulation benchmark, cached per
+  replicate: SLiM with three mutation types -> per-category GRGs -> one
+  annotation-partitioned fit at the production defaults, recording runtime,
+  `status`, and every `sigma_b2_c`/`tau_c` against its generating value
+  (`benchmarks/multicomponent/`, with `tests/test_multicomponent_benchmark.py`
+  covering the aggregation/plotting stage; results are regenerable and stay
+  untracked).
 
 Current benchmark context is documented in
 `docs/tutorials/bolt_benchmark.rst`. The latest regenerated figure reports
@@ -239,15 +242,23 @@ multi-component model". Simplified prior only; the full model is frozen.
   convention is not verified in this repository. The docstrings no longer claim
   it does. Verifying it needs an external reference run, not another internal
   test.
-- [ ] **MC2 — Joint multi-component MoM / Haseman–Elston.** Generalize
-  `haseman_elston_initialization()` to the `(|c|+1)`-dimensional moment system.
-  Initialization matters more here than in the single-component case: six shape
-  coordinates, several weakly identified by construction.
+- [ ] **MC2 — Joint multi-component MoM / Haseman–Elston.** The
+  `(|c|+1)`-dimensional moment system exists as
+  `joint_mom_initialization()`; what is missing is wiring it into
+  `fit_multicomponent_reml()` as an `initialization=` mode, the way
+  `fit_reml(initialization="he")` works. Note the benchmark evidence: ten of
+  ten `n=2000` fits converged from the generic initial point, so
+  initialization is not currently blocking convergence — it would be aimed at
+  the shape coordinates' identifiability, which the open finding above shows a
+  better starting point alone will not fix.
 - [ ] **MC3 — Estimand adapters and reporting.** Both heritability conventions;
   per-MAF-bin genic-variance decomposition; scientific-scale delta-method
   standard errors plus profile likelihoods for each `sigma_b2_c` and `tau_c`;
-  boundary-aware likelihood-ratio tests;
-  gene-level output with pooled shape parameters.
+  boundary-aware likelihood-ratio tests; gene-level output with pooled shape
+  parameters. The pieces are implemented (see "Phase 1 supporting utilities");
+  what keeps this open is that reporting a per-category `tau_c` is not
+  defensible at the benchmark's sample size, so the reporting surface still
+  needs an identifiability statement attached to `tau_c`.
 - [ ] **MC4 — WES data path.** Exome pVCF/BGEN to GRG conversion; annotation
   masks as first-class variant partitions; MAC/MAF filters applied before
   frequency recomputation; measured GRG compression on exome rare variants.
@@ -268,13 +279,9 @@ Acceptance gate. All four clauses, no qualifiers:
 4. The reproduced RareEffect baseline matches an independent reimplementation on
    a small dense case.
 
-**The sketch budget is retained for tests and exploratory fits.** The default
-`cg_tol=5e-4` and sketch probe budget keep small-dataset verification and
-exploratory production runs computationally comparable. They are not, by
-themselves, a guarantee of trustworthy large-scale estimates, and nothing in
-this file now measures whether they are: the convergence criterion is decided
-(Priority 2, "Convergence policy — decided"), and acceptance at realistic data
-size was removed by decision rather than satisfied.
+**The sketch budget is retained for tests and exploratory fits**, and the
+benchmark below uses it unchanged. Priority 2 owns the solver defaults and the
+convergence criterion; this section does not restate them.
 
 Gate status, re-audited 2026-08-20 after the fixes below — **all four clauses
 are met, and the tests that back them have been checked to fail against the
@@ -299,7 +306,29 @@ constructions they replaced.**
    expectation by calling the function under test, so it could not fail.
 
 The convergence criterion these fits are judged by is recorded under
-Priority 2, "Convergence policy — decided".
+Priority 2, "Convergence policy — decided"; convergence and recovery at
+`n = 2000` are measured there under "Convergence at realistic data size".
+
+**Open finding: per-category `tau_c` is not identified at `n = 2000`.** The
+ten-replicate forward-simulation benchmark recovers `sigma_e2` and every
+`sigma_b2_c` but not a single `tau_c`; estimates land on the flat boundary or
+in the tens against generating values of `1.125`, `0.5`, `0.125`. This is a
+property of the likelihood, not of the optimizer: the returned points are
+within `0.3-1.5` nats of the objective at the generating `tau_c`, and the
+`tau[missense]` profile's minimiser moves between roughly `0`, `1` and `20`
+across three replicates.
+Consequences, none of them addressed yet:
+
+- A reported per-category `tau_c` from a fit of this size is not an estimate of
+  the generating composite. MC3's `tau_c` reporting therefore needs an
+  identifiability statement, not just a standard error.
+- The pooled-shape path (`fit_tau=False`) exists precisely for this regime:
+  pooling `tau_c` across genes, or across categories, is the obvious response,
+  but which pooling the science wants is undecided.
+- It is not yet known whether this is the sample size, the three-way split of
+  ~8,000 variants, the frequency spectrum, or `W_S`/DFE confounding in the
+  composite. Deciding that needs a designed experiment, not another fitter
+  change.
 
 Defects found in the same audit, all now fixed:
 
@@ -493,17 +522,10 @@ Deliberately **not** decided:
   is not one.
 - Only `tau_c` boundaries are reported. A scale coordinate pinned at its
   `+/-30` coordinate bound is not.
-- **Convergence acceptance at realistic data size was removed, deliberately.**
-  There is no requirement in this file to demonstrate convergence or recovery
-  at production `n`, and none is performed. What exists is the seeded
-  two-category convergence-and-recovery test at `n=600` on dense data, which is
-  a unit test of the criterion, not evidence about production-sized data.
-  The "failures return actionable diagnostics" half of the former gate is met
-  by the `status` taxonomy. Anyone reporting an estimate from a real-sized fit
-  is relying on the criterion's construction, not on a measured acceptance
-  result. Note that `notes/rare_variant.md` still gates its Phase 3 on the
-  convergence policy; that file is not edited from here, so the two documents
-  now disagree and the owner has to reconcile them.
+- The former *acceptance-gate* framing was removed by decision: this file sets
+  no pass/fail bar for convergence at realistic data size. Evidence at that
+  size does exist — see "Convergence at realistic data size" below — so the
+  question is closed as measured, not as required.
 
 The stochastic defaults remain the cheap end of the range: `trace_probes=12`
 and `cg_tol=5e-4`, the latter matching GRAPP's solver budget so per-application
@@ -518,14 +540,55 @@ The documentation benchmark intentionally caps optimization at eight iterations
 and reports secant/convergence warnings from the comparison path. That setup is
 useful for timing and says nothing about convergence.
 
-Acceptance gate, convergence: removed by decision — see the last bullet under
-"Deliberately not decided" above. Nothing here requires convergence evidence at
-realistic data size.
+#### Convergence at realistic data size — measured
+
+`benchmarks/multicomponent/` fits ten independent SLiM forward simulations at
+`n = 2000` with three annotation categories and roughly 7,400-8,150 mutations,
+GRGL-backed, at the production defaults (`cg_tol=5e-4`, 12 probes) from the
+generic initial point. Results on this machine:
+
+- **Convergence: 10/10 replicates return `status="converged"`.** This is the
+  evidence the deleted acceptance gate asked for, and it is now the reason the
+  question is closed rather than open.
+- **Scales are recovered.** `sigma_e2` estimates span `0.352-0.414` against a
+  generating `0.4`; `sigma_b2` per category spans `2.06-2.42` (truth `2.25`),
+  `0.88-1.24` (truth `1.00`), and `0.15-0.47` (truth `0.25`).
+- **`tau_c` is not recovered, and that is not a fitter defect.** Every replicate
+  puts at least one category on the flat boundary (order `1e-8`) and at least
+  one in the range `1.5` to `91`, against generating values of `1.125`, `0.5`,
+  `0.125`. Checked directly on replicates 1, 4 and 8: the profiled REML
+  objective at each returned point is within `0.3-1.5` nats of the objective at
+  the generating `tau_c` — better than the truth in replicate 8, worse in 1 and
+  4 — so the fitter is not sitting somewhere the likelihood rejects. What moves
+  is the optimum itself: profiling `tau[missense]` with the other coordinates
+  at the fit puts its minimum near `20` in replicate 1 (the generating `0.5` is
+  `2.3` nats worse), near `0` in replicate 4 (rising steeply, `27` nats by
+  `tau=80`), and near `1` in replicate 8 with the generating value only `0.005`
+  nats above it. The location of the optimum in `tau_c` is therefore not stable
+  across draws at this sample size, even though each fit is near its own
+  optimum. Per-category `tau_c` from a fit of this size should not be reported
+  as an estimate of the generating composite. See "Open finding" in the active
+  workstream.
+
+Runtime, same ten replicates: SLiM plus conversion `266-351 s`, fit
+`26-137 s`. Reported as profiling, not as a performance guarantee.
+
+- [ ] `benchmarks/multicomponent/infer.py` records `status` but not
+  `fit.warnings`, so the `tau_c` boundary reports do not reach the CSV even
+  though they fire on most of these replicates. Adding the column costs a rerun
+  of the inference and plotting stages for all ten cached replicates.
+
+`notes/rare_variant.md` still gates its Phase 3 on the convergence policy. That
+file is not edited from here; its gate is now satisfiable by the measurement
+above, but the wording is the owner's to reconcile.
 
 #### Performance
 
-Warm starts removed most redundant CG work, but the ten-replicate benchmark
-still shows evo-lmm slower than GRAPP. Profile before adding more machinery.
+Warm starts removed most redundant CG work, but the ten-replicate single-
+component benchmark in `docs/tutorials/bolt_benchmark.rst` still shows evo-lmm
+slower than GRAPP. Profile before adding more machinery. (The multi-component
+benchmark under `benchmarks/multicomponent/` is a different artifact and has no
+GRAPP comparison: GRAPP has no annotation-partitioned model to compare against.)
 
 - [ ] Attribute remaining time to GRG traversals, derivative construction,
   trace queries, Python orchestration, LOCO setup, and optimizer evaluations.
@@ -553,7 +616,10 @@ still shows evo-lmm slower than GRAPP. Profile before adding more machinery.
 
 Acceptance gate, performance: report end-to-end time, estimate changes,
 convergence status, and operator-equivalent work over multiple persisted
-replicates. For the two-stage item specifically, the gate is that estimates and
+replicates. Partially met by `benchmarks/multicomponent/`, which reports
+per-replicate simulation, fit, and total time, the estimates, and `status` over
+ten cached replicates. Operator-equivalent work is still not recorded, so the
+attribution items above stay open. For the two-stage item specifically, the gate is that estimates and
 convergence match a single-stage fit run entirely at the refinement budget, at
 lower total cost.
 
@@ -604,8 +670,11 @@ uv run python -c "import evo_lmm, pygrgl"
 uv run sphinx-build -W -b html docs docs/_build/html
 ```
 
-At the last audit `uv run pytest -q` collected 69 tests and all 69 passed on
+At the last audit `uv run pytest -q` collected 70 tests and all 70 passed on
 darwin/arm64, including the `large` markers.
+`tests/test_multicomponent_benchmark.py` covers the multi-component benchmark's
+aggregation and plotting stage on synthetic rows; the forward simulations and
+the fits themselves are run through the Snakefile, not the test suite.
 `test_large_grg_matrix_free_fit_matches_dense_parameter_oracle` was once
 reported to fail on aarch64 Linux with a stochastic-tolerance mismatch; it
 passes here, so that report is unconfirmed on this machine. The
@@ -628,4 +697,6 @@ calibrated, end-to-end CPU analysis path in which:
 3. null calibration and dense/GRG equivalence tests pass (done);
 4. BLUP and association preserve the `rho^2 = 1` nested identity (done); and
 5. the multi-replicate benchmark reports accuracy and runtime without rerunning
-   forward simulations.
+   forward simulations (done for the multi-component path:
+   `benchmarks/multicomponent/` caches per replicate, so changing `infer.py`
+   reruns inference and plotting only).
