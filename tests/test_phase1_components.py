@@ -6,26 +6,30 @@ from evo_lmm import (
     SimplifiedPrior,
     boundary_lrt_pvalue,
     collapse_mac,
+    fit_genes,
+    fit_multicomponent_reml,
+    fit_parameter_profiles,
+    fit_rare_effect_baseline,
+    fit_report,
+    fit_tau_profiles,
     genic_variance_by_maf,
     heritability_conventions,
     joint_mom_initialization,
-    fit_multicomponent_reml,
-    fit_genes,
-    fit_report,
-    fit_parameter_profiles,
-    fit_tau_profiles,
-    fit_rare_effect_baseline,
     rare_effect_mom_ratio,
 )
 
 
 def _fixture():
     rng = np.random.default_rng(123)
-    g = {"lof": rng.binomial(2, 0.1, (20, 4)).astype(float),
-         "missense": rng.binomial(2, 0.3, (20, 5)).astype(float)}
+    g = {
+        "lof": rng.binomial(2, 0.1, (20, 4)).astype(float),
+        "missense": rng.binomial(2, 0.3, (20, 5)).astype(float),
+    }
     f = {key: value.mean(axis=0) / 2 for key, value in g.items()}
     ops = MultiComponentOps.from_dense(g, f)
-    prior = MultiComponentPrior(ops.labels, (SimplifiedPrior(1.0, 0.3), SimplifiedPrior(0.7, 0.8)))
+    prior = MultiComponentPrior(
+        ops.labels, (SimplifiedPrior(1.0, 0.3), SimplifiedPrior(0.7, 0.8))
+    )
     return g, f, ops, prior
 
 
@@ -46,22 +50,43 @@ def test_joint_mom_reports_raw_and_truncated_estimates():
     projected = ops.project(y)
     kernels = ops.component_kernels(prior)
     traces = np.asarray([np.trace(kernel) for kernel in kernels.values()])
-    expected_system = np.block([
-        [np.asarray([[np.trace(left @ right) for right in kernels.values()]
-                     for left in kernels.values()]), traces[:, None]],
-        [traces[None, :], np.asarray([[ops.dim]])],
-    ])
+    expected_system = np.block(
+        [
+            [
+                np.asarray(
+                    [
+                        [np.trace(left @ right) for right in kernels.values()]
+                        for left in kernels.values()
+                    ]
+                ),
+                traces[:, None],
+            ],
+            [traces[None, :], np.asarray([[ops.dim]])],
+        ]
+    )
     expected_rhs = np.asarray(
         [projected @ kernel @ projected for kernel in kernels.values()]
         + [projected @ projected]
     )
     expected_raw = np.linalg.solve(expected_system, expected_rhs)
     np.testing.assert_allclose(result.system, expected_system, rtol=1e-12, atol=1e-12)
-    np.testing.assert_allclose(result.raw_component_scales, expected_raw[:-1], rtol=1e-12, atol=1e-12)
-    np.testing.assert_allclose(result.residual_variance, max(expected_raw[-1], np.finfo(float).tiny))
-    np.testing.assert_array_equal(result.component_scales, np.maximum(expected_raw[:-1], 0.0))
-    xtrace_result = joint_mom_initialization(ops, np.random.default_rng(2).normal(size=ops.n), prior,
-                                             trace_method="xtrace", trace_probes=4, seed=4)
+    np.testing.assert_allclose(
+        result.raw_component_scales, expected_raw[:-1], rtol=1e-12, atol=1e-12
+    )
+    np.testing.assert_allclose(
+        result.residual_variance, max(expected_raw[-1], np.finfo(float).tiny)
+    )
+    np.testing.assert_array_equal(
+        result.component_scales, np.maximum(expected_raw[:-1], 0.0)
+    )
+    xtrace_result = joint_mom_initialization(
+        ops,
+        np.random.default_rng(2).normal(size=ops.n),
+        prior,
+        trace_method="xtrace",
+        trace_probes=4,
+        seed=4,
+    )
     assert xtrace_result.trace_standard_errors is not None
 
 
@@ -69,7 +94,9 @@ def test_production_ai_reml_supports_hutchinson_and_xtrace():
     _, _, ops, _ = _fixture()
     y = np.random.default_rng(9).normal(size=ops.n)
     for trace_method in ("hutchinson", "xtrace"):
-        fit = fit_multicomponent_reml(ops, y, max_iter=2, trace_method=trace_method, trace_probes=4)
+        fit = fit_multicomponent_reml(
+            ops, y, max_iter=2, trace_method=trace_method, trace_probes=4
+        )
         assert np.isfinite(fit.objective)
         assert fit.ai_covariance is not None
         assert fit.standard_errors is not None
@@ -79,9 +106,14 @@ def test_production_ai_reml_supports_hutchinson_and_xtrace():
         assert report.maf_decomposition is not None
         assert np.isfinite(report.heritability_se)
         assert set(report.component_standard_errors) == {
-            "sigma_b2[lof]", "tau[lof]", "sigma_b2[missense]", "tau[missense]"
+            "sigma_b2[lof]",
+            "tau[lof]",
+            "sigma_b2[missense]",
+            "tau[missense]",
         }
-        assert all(np.isfinite(value) for value in report.component_standard_errors.values())
+        assert all(
+            np.isfinite(value) for value in report.component_standard_errors.values()
+        )
         profiles = fit_parameter_profiles(
             fit,
             {"sigma_b2[lof]": [0.5, 1.0, 2.0], "tau[missense]": [0.0, 0.3, 0.8]},
@@ -92,14 +124,53 @@ def test_production_ai_reml_supports_hutchinson_and_xtrace():
             assert np.ptp(profile.objective) > 1e-10
 
 
+def test_joint_haseman_elston_is_available_as_multicomponent_fit_mode():
+    """MC2 wires the joint moment system into the partitioned REML fitter."""
+    _, _, ops, prior = _fixture()
+    y = np.random.default_rng(31).normal(size=ops.n)
+    moment = joint_mom_initialization(ops, y, prior, trace_method="exact", seed=7)
+    fit = fit_multicomponent_reml(
+        ops,
+        y,
+        initial=prior,
+        initialization="he",
+        max_iter=0,
+        trace_probes=4,
+        seed=7,
+    )
+    assert fit.initialization == "he"
+    np.testing.assert_array_equal(
+        fit.mom_raw_component_scales, moment.raw_component_scales
+    )
+    np.testing.assert_array_equal(fit.mom_truncated, moment.truncated)
+    # HE conditions on the requested evolutionary weights; it does not invent
+    # a nonlinear tau initializer from the linear covariance moments.
+    np.testing.assert_array_equal(fit.prior.tau, prior.tau)
+
+
+def test_multicomponent_fit_rejects_unknown_initialization_mode():
+    _, _, ops, _ = _fixture()
+    with np.testing.assert_raises(ValueError):
+        fit_multicomponent_reml(
+            ops, np.random.default_rng(32).normal(size=ops.n), initialization="nonsense"
+        )
+
+
 def test_gene_reporting_pools_tau_and_fits_category_scales():
     _, _, ops, _ = _fixture()
     prior = MultiComponentPrior(
         ops.labels, (SimplifiedPrior(1.0, 0.3), SimplifiedPrior(0.7, 0.8))
     )
-    reports = fit_genes({"gene1": ops}, np.random.default_rng(12).normal(size=ops.n),
-                        {label: component.tau for label, component in zip(prior.labels, prior.components)},
-                        max_iter=1, trace_probes=4)
+    reports = fit_genes(
+        {"gene1": ops},
+        np.random.default_rng(12).normal(size=ops.n),
+        {
+            label: component.tau
+            for label, component in zip(prior.labels, prior.components)
+        },
+        max_iter=1,
+        trace_probes=4,
+    )
     assert reports["gene1"].gene == "gene1"
     assert set(reports["gene1"].pooled_tau) == set(ops.labels)
     assert reports["gene1"].pooled_tau == {
@@ -135,8 +206,10 @@ def _error_contrast_rare_effect(genotypes, basis, y):
     contrasts = null_space(basis.T)
     reduced_y = contrasts.T @ y
     dimension = reduced_y.size
-    reduced = {label: (contrasts.T @ matrix) @ (contrasts.T @ matrix).T
-               for label, matrix in genotypes.items()}
+    reduced = {
+        label: (contrasts.T @ matrix) @ (contrasts.T @ matrix).T
+        for label, matrix in genotypes.items()
+    }
     labels = list(genotypes)
     marginal, marginal_mom = [], []
     for label in labels:
@@ -146,17 +219,26 @@ def _error_contrast_rare_effect(genotypes, basis, y):
 
         def objective(log_delta, eigenvalues=eigenvalues, rotated=rotated):
             delta = np.exp(log_delta)
-            quadratic = float(np.sum(rotated ** 2 / (eigenvalues + delta)))
-            return 0.5 * (float(np.sum(np.log(eigenvalues + delta)))
-                          + dimension * np.log(quadratic / dimension))
+            quadratic = float(np.sum(rotated**2 / (eigenvalues + delta)))
+            return 0.5 * (
+                float(np.sum(np.log(eigenvalues + delta)))
+                + dimension * np.log(quadratic / dimension)
+            )
 
-        best = minimize_scalar(objective, bounds=(-30.0, 30.0), method="bounded",
-                               options={"xatol": 1e-12})
+        best = minimize_scalar(
+            objective, bounds=(-30.0, 30.0), method="bounded", options={"xatol": 1e-12}
+        )
         delta = float(np.exp(best.x))
-        marginal.append(float(np.sum(rotated ** 2 / (eigenvalues + delta))) / dimension)
-        system = np.array([[float(np.sum(eigenvalues ** 2)), float(np.sum(eigenvalues))],
-                           [float(np.sum(eigenvalues)), float(dimension)]])
-        rhs = np.array([float(reduced_y @ kernel @ reduced_y), float(reduced_y @ reduced_y)])
+        marginal.append(float(np.sum(rotated**2 / (eigenvalues + delta))) / dimension)
+        system = np.array(
+            [
+                [float(np.sum(eigenvalues**2)), float(np.sum(eigenvalues))],
+                [float(np.sum(eigenvalues)), float(dimension)],
+            ]
+        )
+        rhs = np.array(
+            [float(reduced_y @ kernel @ reduced_y), float(reduced_y @ reduced_y)]
+        )
         marginal_mom.append(float(np.linalg.solve(system, rhs)[0]))
     count = len(labels)
     system = np.empty((count + 1, count + 1))
@@ -189,9 +271,11 @@ def test_rare_effect_baseline_matches_an_error_contrast_reimplementation():
     """
     genotypes, _, ops, _ = _fixture()
     rng = np.random.default_rng(19)
-    y = (genotypes["lof"] @ rng.normal(0.0, 0.8, genotypes["lof"].shape[1])
-         + genotypes["missense"] @ rng.normal(0.0, 0.5, genotypes["missense"].shape[1])
-         + rng.normal(0.0, 1.5, ops.n))
+    y = (
+        genotypes["lof"] @ rng.normal(0.0, 0.8, genotypes["lof"].shape[1])
+        + genotypes["missense"] @ rng.normal(0.0, 0.5, genotypes["missense"].shape[1])
+        + rng.normal(0.0, 1.5, ops.n)
+    )
 
     result = fit_rare_effect_baseline(ops, y)
     marginal, marginal_mom, joint, adjusted, fallback = _error_contrast_rare_effect(
@@ -205,10 +289,18 @@ def test_rare_effect_baseline_matches_an_error_contrast_reimplementation():
     np.testing.assert_array_equal(result.negative_mom_fallback, fallback)
 
     # Recorded from this fixture; both implementations must keep reproducing them.
-    np.testing.assert_allclose(result.marginal_scales, [0.5312628449, 0.2067134205], rtol=1e-6)
-    np.testing.assert_allclose(result.marginal_mom_scales, [0.610498666, 0.09999417018], rtol=1e-8)
-    np.testing.assert_allclose(result.joint_mom_scales, [0.5970611186, 0.09172101803], rtol=1e-8)
-    np.testing.assert_allclose(result.adjusted_scales, [0.5195693392, 0.1896107076], rtol=1e-6)
+    np.testing.assert_allclose(
+        result.marginal_scales, [0.5312628449, 0.2067134205], rtol=1e-6
+    )
+    np.testing.assert_allclose(
+        result.marginal_mom_scales, [0.610498666, 0.09999417018], rtol=1e-8
+    )
+    np.testing.assert_allclose(
+        result.joint_mom_scales, [0.5970611186, 0.09172101803], rtol=1e-8
+    )
+    np.testing.assert_allclose(
+        result.adjusted_scales, [0.5195693392, 0.1896107076], rtol=1e-6
+    )
 
 
 def test_rare_effect_baseline_falls_back_on_a_non_positive_moment_estimate():
@@ -257,7 +349,9 @@ def test_parameter_profiles_are_evaluated_on_the_reported_scientific_scale():
     _, _, ops, _ = _fixture()
     y = 4.0 * np.random.default_rng(31).normal(size=ops.n)
     fit = fit_multicomponent_reml(ops, y, max_iter=6, trace_probes=8)
-    assert abs(fit.sigma_e2 - 1.0) > 0.5, "fixture no longer exercises the profiled scale"
+    assert abs(fit.sigma_e2 - 1.0) > 0.5, (
+        "fixture no longer exercises the profiled scale"
+    )
 
     fitted_sigma_b2 = float(fit.prior.components[0].sigma_b2)
     at_fit = profiled_reml_objective(ops, y, _ratio_prior(fit, fit.prior.components))[0]
@@ -289,11 +383,19 @@ def test_gene_fitting_conditions_on_pooled_shapes_without_re_estimating_them():
     for index, label in enumerate(ops.labels):
         np.testing.assert_allclose(
             reports["gene1"].sigma_b2_by_category[label],
-            conditioned.prior.components[index].sigma_b2, rtol=1e-12,
+            conditioned.prior.components[index].sigma_b2,
+            rtol=1e-12,
         )
     free = fit_multicomponent_reml(ops, y, initial=initial, max_iter=15, trace_probes=8)
-    assert any(abs(free.prior.tau[index] - pooled[label]) > 1e-8
-               for index, label in enumerate(ops.labels)), "fixture no longer moves tau when free"
-    assert any(abs(free.prior.components[index].sigma_b2
-                   - conditioned.prior.components[index].sigma_b2) > 1e-8
-               for index in range(len(ops.labels))), "pooled and free fits are indistinguishable here"
+    assert any(
+        abs(free.prior.tau[index] - pooled[label]) > 1e-8
+        for index, label in enumerate(ops.labels)
+    ), "fixture no longer moves tau when free"
+    assert any(
+        abs(
+            free.prior.components[index].sigma_b2
+            - conditioned.prior.components[index].sigma_b2
+        )
+        > 1e-8
+        for index in range(len(ops.labels))
+    ), "pooled and free fits are indistinguishable here"

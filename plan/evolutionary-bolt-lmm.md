@@ -242,23 +242,28 @@ multi-component model". Simplified prior only; the full model is frozen.
   convention is not verified in this repository. The docstrings no longer claim
   it does. Verifying it needs an external reference run, not another internal
   test.
-- [ ] **MC2 — Joint multi-component MoM / Haseman–Elston.** The
-  `(|c|+1)`-dimensional moment system exists as
-  `joint_mom_initialization()`; what is missing is wiring it into
-  `fit_multicomponent_reml()` as an `initialization=` mode, the way
-  `fit_reml(initialization="he")` works. Note the benchmark evidence: ten of
-  ten `n=2000` fits converged from the generic initial point, so
-  initialization is not currently blocking convergence — it would be aimed at
-  the shape coordinates' identifiability, which the open finding above shows a
-  better starting point alone will not fix.
+- [x] **MC2 — Joint multi-component MoM / Haseman–Elston.** The
+  `(|c|+1)`-dimensional moment system in `joint_mom_initialization()` is wired
+  into `fit_multicomponent_reml(initialization="he")`, mirroring the
+  single-component fitter. It initializes the residual-relative component
+  scales conditional on the requested evolutionary weights; it does not claim
+  to identify or initialize nonlinear `tau_c` shapes. Raw MoM scales and
+  negative-scale flags remain available on `MultiComponentFit` for the
+  no-truncation audit. Ten of ten `n=2000` fits also converge from the generic
+  initial point, so this is an optional initializer rather than a convergence
+  workaround.
 - [ ] **MC3 — Estimand adapters and reporting.** Both heritability conventions;
   per-MAF-bin genic-variance decomposition; scientific-scale delta-method
   standard errors plus profile likelihoods for each `sigma_b2_c` and `tau_c`;
   boundary-aware likelihood-ratio tests; gene-level output with pooled shape
-  parameters. The pieces are implemented (see "Phase 1 supporting utilities");
-  what keeps this open is that reporting a per-category `tau_c` is not
-  defensible at the benchmark's sample size, so the reporting surface still
-  needs an identifiability statement attached to `tau_c`.
+  parameters. All of it is implemented (see "Phase 1 supporting utilities")
+  except the likelihood-ratio clause: `boundary_lrt_pvalue()` supplies the
+  boundary-mixture null, but nothing assembles the statistic from two fits, and
+  the AI path cannot supply one — its `objective` field is `0.5*||score||^2`,
+  not a likelihood, so an LR statistic can only come from
+  `profiled_reml_objective` on the exact dense path. Closing MC3 means either
+  wiring that assembly for the dense path and documenting the restriction, or
+  giving the AI path a usable objective.
 - [ ] **MC4 — WES data path.** Exome pVCF/BGEN to GRG conversion; annotation
   masks as first-class variant partitions; MAC/MAF filters applied before
   frequency recomputation; measured GRG compression on exome rare variants.
@@ -309,26 +314,18 @@ The convergence criterion these fits are judged by is recorded under
 Priority 2, "Convergence policy — decided"; convergence and recovery at
 `n = 2000` are measured there under "Convergence at realistic data size".
 
-**Open finding: per-category `tau_c` is not identified at `n = 2000`.** The
-ten-replicate forward-simulation benchmark recovers `sigma_e2` and every
-`sigma_b2_c` but not a single `tau_c`; estimates land on the flat boundary or
-in the tens against generating values of `1.125`, `0.5`, `0.125`. This is a
-property of the likelihood, not of the optimizer: the returned points are
-within `0.3-1.5` nats of the objective at the generating `tau_c`, and the
-`tau[missense]` profile's minimiser moves between roughly `0`, `1` and `20`
-across three replicates.
-Consequences, none of them addressed yet:
-
-- A reported per-category `tau_c` from a fit of this size is not an estimate of
-  the generating composite. MC3's `tau_c` reporting therefore needs an
-  identifiability statement, not just a standard error.
-- The pooled-shape path (`fit_tau=False`) exists precisely for this regime:
-  pooling `tau_c` across genes, or across categories, is the obvious response,
-  but which pooling the science wants is undecided.
-- It is not yet known whether this is the sample size, the three-way split of
-  ~8,000 variants, the frequency spectrum, or `W_S`/DFE confounding in the
-  composite. Deciding that needs a designed experiment, not another fitter
-  change.
+**`tau_c` recovery is not a target, and the benchmark confirms why.** The
+paper's identifiability result, quoted in `notes/rare_variant.md` section 2.2,
+already settles this: `1 + 2 tau_c q_j` sits close to one under a U-shaped
+frequency spectrum, `sigma_b_c^2` sets the overall scale while `tau_c` enters
+only as a weak frequency modulation, and the conclusion recorded there is to
+write the analysis around `sigma_b_c^2`, not `tau_c`. The benchmark measures
+exactly that: `sigma_b_c^2` and `sigma_e2` are recovered, individual `tau_c`
+are not, and the fits sit at their own optima while doing so. No work item
+follows from it. What does follow is that `tau_c` is reported with the
+identifiability caveat attached and never as the headline estimand, and that
+the quantity to watch is the accuracy of `sigma_b_c^2` — see the
+smallest-component bias recorded under Priority 2.
 
 Defects found in the same audit, all now fixed:
 
@@ -550,25 +547,34 @@ generic initial point. Results on this machine:
 - **Convergence: 10/10 replicates return `status="converged"`.** This is the
   evidence the deleted acceptance gate asked for, and it is now the reason the
   question is closed rather than open.
-- **Scales are recovered.** `sigma_e2` estimates span `0.352-0.414` against a
-  generating `0.4`; `sigma_b2` per category spans `2.06-2.42` (truth `2.25`),
-  `0.88-1.24` (truth `1.00`), and `0.15-0.47` (truth `0.25`).
-- **`tau_c` is not recovered, and that is not a fitter defect.** Every replicate
-  puts at least one category on the flat boundary (order `1e-8`) and at least
-  one in the range `1.5` to `91`, against generating values of `1.125`, `0.5`,
-  `0.125`. Checked directly on replicates 1, 4 and 8: the profiled REML
-  objective at each returned point is within `0.3-1.5` nats of the objective at
-  the generating `tau_c` — better than the truth in replicate 8, worse in 1 and
-  4 — so the fitter is not sitting somewhere the likelihood rejects. What moves
-  is the optimum itself: profiling `tau[missense]` with the other coordinates
-  at the fit puts its minimum near `20` in replicate 1 (the generating `0.5` is
-  `2.3` nats worse), near `0` in replicate 4 (rising steeply, `27` nats by
-  `tau=80`), and near `1` in replicate 8 with the generating value only `0.005`
-  nats above it. The location of the optimum in `tau_c` is therefore not stable
-  across draws at this sample size, even though each fit is near its own
-  optimum. Per-category `tau_c` from a fit of this size should not be reported
-  as an estimate of the generating composite. See "Open finding" in the active
-  workstream.
+- **The scales — the primary estimands — are recovered.** Mean and sample SD
+  over the ten replicates, against the generating value:
+
+  | quantity | truth | mean | SD | bias |
+  | --- | --- | --- | --- | --- |
+  | `sigma_e2` | `0.400` | `0.3834` | `0.0166` | `-4.1%` |
+  | `sigma_b2_lof` | `2.250` | `2.2718` | `0.1173` | `+1.0%` |
+  | `sigma_b2_missense` | `1.000` | `1.0795` | `0.0945` | `+8.0%` |
+  | `sigma_b2_synonymous` | `0.250` | `0.3175` | `0.0946` | `+27.0%` |
+
+  The two larger components are recovered well. The smallest one is biased
+  upward by `27%` with a `30%` coefficient of variation; at ten replicates that
+  is about `2.3` standard errors of the mean, so it is suggestive of a real
+  small-component bias rather than established. Since `sigma_b_c^2` is the
+  reported estimand, this is the number worth another look — more replicates
+  would settle whether the bias is real.
+- **Individual `tau_c` are not recovered — expected, and not a fitter defect.**
+  Every replicate puts at least one category on the flat boundary (order
+  `1e-8`) and at least one in the range `1.5` to `91`, against generating
+  values of `1.125`, `0.5`, `0.125`. This is the identifiability result the
+  model is built on (`notes/rare_variant.md` section 2.2), so it is recorded
+  rather than chased. It was checked once, on replicates 1, 4 and 8, only to
+  confirm the fitter is not masking a defect: each returned point is within
+  `0.3-1.5` nats of the objective at the generating `tau_c` — better than the
+  truth in replicate 8, worse in 1 and 4 — and profiling `tau[missense]` puts
+  its minimum near `20`, `0` and `1` respectively. The fits sit at their own
+  optima; it is the optimum's location in `tau_c` that is not stable across
+  draws.
 
 Runtime, same ten replicates: SLiM plus conversion `266-351 s`, fit
 `26-137 s`. Reported as profiling, not as a performance guarantee.

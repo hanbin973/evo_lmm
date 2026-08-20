@@ -34,32 +34,41 @@ class MultiComponentPrior:
 
     def __post_init__(self) -> None:
         if len(self.labels) == 0 or len(self.labels) != len(self.components):
-            raise ValueError("labels and components must be non-empty and have equal length")
+            raise ValueError(
+                "labels and components must be non-empty and have equal length"
+            )
         if len(set(self.labels)) != len(self.labels):
             raise ValueError("component labels must be unique")
 
     @classmethod
     def from_parameters(
         cls, parameters: Mapping[Any, tuple[float, float]]
-    ) -> "MultiComponentPrior":
+    ) -> MultiComponentPrior:
         labels = tuple(parameters)
-        return cls(labels, tuple(SimplifiedPrior(*parameters[label]) for label in labels))
+        return cls(
+            labels, tuple(SimplifiedPrior(*parameters[label]) for label in labels)
+        )
 
     @classmethod
-    def flat(cls, labels: Sequence[Any], scales: Sequence[float] | None = None) -> "MultiComponentPrior":
+    def flat(
+        cls, labels: Sequence[Any], scales: Sequence[float] | None = None
+    ) -> MultiComponentPrior:
         """Return the exact M0 boundary with all ``tau_c = 0``."""
         labels_tuple = tuple(labels)
         scale_values = [1.0] * len(labels_tuple) if scales is None else list(scales)
         if len(scale_values) != len(labels_tuple):
             raise ValueError("scales must match labels")
-        return cls(labels_tuple, tuple(SimplifiedPrior(scale, 0.0) for scale in scale_values))
+        return cls(
+            labels_tuple, tuple(SimplifiedPrior(scale, 0.0) for scale in scale_values)
+        )
 
-    def with_shared_tau(self, tau: float) -> "MultiComponentPrior":
+    def with_shared_tau(self, tau: float) -> MultiComponentPrior:
         """Return M1's shared-``tau`` identifiability-crutch specification."""
         if tau < 0 or not np.isfinite(tau):
             raise ValueError("tau must be finite and non-negative")
         return MultiComponentPrior(
-            self.labels, tuple(SimplifiedPrior(p.sigma_b2, tau) for p in self.components)
+            self.labels,
+            tuple(SimplifiedPrior(p.sigma_b2, tau) for p in self.components),
         )
 
     @property
@@ -74,20 +83,32 @@ class MultiComponentPrior:
     def coordinates(self) -> np.ndarray:
         values = []
         for component in self.components:
-            values.extend((np.log(component.sigma_b2),
-                           np.log(component.tau) if component.tau > 0 else -np.inf))
+            values.extend(
+                (
+                    np.log(component.sigma_b2),
+                    np.log(component.tau) if component.tau > 0 else -np.inf,
+                )
+            )
         return np.asarray(values, dtype=np.float64)
 
     @classmethod
-    def from_coordinates(cls, labels: Sequence[Any], coordinates: np.ndarray) -> "MultiComponentPrior":
+    def from_coordinates(
+        cls, labels: Sequence[Any], coordinates: np.ndarray
+    ) -> MultiComponentPrior:
         labels_tuple = tuple(labels)
         values = np.asarray(coordinates, dtype=np.float64)
         if values.shape != (2 * len(labels_tuple),):
-            raise ValueError("coordinates must contain (log_sigma_b2, log_tau) per component")
+            raise ValueError(
+                "coordinates must contain (log_sigma_b2, log_tau) per component"
+            )
         components = []
         for index in range(len(labels_tuple)):
             sigma = float(np.exp(values[2 * index]))
-            tau = float(np.exp(values[2 * index + 1])) if np.isfinite(values[2 * index + 1]) else 0.0
+            tau = (
+                float(np.exp(values[2 * index + 1]))
+                if np.isfinite(values[2 * index + 1])
+                else 0.0
+            )
             components.append(SimplifiedPrior(sigma, tau))
         return cls(labels_tuple, tuple(components))
 
@@ -100,8 +121,12 @@ class MultiComponentOps:
             raise ValueError("at least one annotation component is required")
         self.components = dict(components)
         first = next(iter(self.components.values()))
-        if any(op.n != first.n or op.rank != first.rank for op in self.components.values()):
-            raise ValueError("all component operators must have the same individuals and covariate rank")
+        if any(
+            op.n != first.n or op.rank != first.rank for op in self.components.values()
+        ):
+            raise ValueError(
+                "all component operators must have the same individuals and covariate rank"
+            )
         self.labels = tuple(self.components)
         self.n = first.n
         self.rank = first.rank
@@ -120,7 +145,9 @@ class MultiComponentOps:
         return array - self.basis @ (self.basis.T @ array)
 
     @classmethod
-    def from_operators(cls, components: Mapping[Any, EvolutionaryLmmOps]) -> "MultiComponentOps":
+    def from_operators(
+        cls, components: Mapping[Any, EvolutionaryLmmOps]
+    ) -> MultiComponentOps:
         """Construct a partition from already-adapted dense or GRGL operators."""
         return cls(components)
 
@@ -130,15 +157,21 @@ class MultiComponentOps:
         genotypes: Mapping[Any, np.ndarray],
         frequencies: Mapping[Any, np.ndarray],
         covariates: np.ndarray | None = None,
-    ) -> "MultiComponentOps":
-        return cls({label: EvolutionaryLmmOps(matrix, frequencies[label], covariates)
-                    for label, matrix in genotypes.items()})
+    ) -> MultiComponentOps:
+        return cls(
+            {
+                label: EvolutionaryLmmOps(matrix, frequencies[label], covariates)
+                for label, matrix in genotypes.items()
+            }
+        )
 
     def component_kernels(self, prior: MultiComponentPrior) -> dict[Any, np.ndarray]:
         if prior.labels != self.labels:
             raise ValueError("prior labels do not match the partition")
-        return {label: component.sigma_b2 * self._component_kernel(label, component)
-                for label, component in zip(prior.labels, prior.components)}
+        return {
+            label: component.sigma_b2 * self._component_kernel(label, component)
+            for label, component in zip(prior.labels, prior.components)
+        }
 
     def _component_kernel(self, label: Any, prior: SimplifiedPrior) -> np.ndarray:
         """Materialize one component only when an exact small fit requests it."""
@@ -149,16 +182,20 @@ class MultiComponentOps:
         return op.apply_k_matmat(identity, prior)
 
     def dense_kernel(self, prior: MultiComponentPrior) -> np.ndarray:
-        return sum(self.component_kernels(prior).values(), start=np.zeros((self.n, self.n)))
+        return sum(
+            self.component_kernels(prior).values(), start=np.zeros((self.n, self.n))
+        )
 
     def kernel_trace(self, prior: MultiComponentPrior) -> float:
         """Return ``tr(P_C K P_C)`` without materialising a dense kernel."""
         if prior.labels != self.labels:
             raise ValueError("prior labels do not match the partition")
-        return float(sum(
-            component.sigma_b2 * self.components[label].kernel_trace(component)
-            for label, component in zip(prior.labels, prior.components)
-        ))
+        return float(
+            sum(
+                component.sigma_b2 * self.components[label].kernel_trace(component)
+                for label, component in zip(prior.labels, prior.components)
+            )
+        )
 
     def apply_k(self, values: np.ndarray, prior: MultiComponentPrior) -> np.ndarray:
         """Apply the summed partitioned kernel to one or many vectors."""
@@ -168,7 +205,8 @@ class MultiComponentOps:
         if matrix.ndim != 2 or matrix.shape[0] != self.n:
             raise ValueError("values must have shape (n,) or (n, k)")
         return sum(
-            component.sigma_b2 * self.components[label].apply_k_matmat(matrix, component)
+            component.sigma_b2
+            * self.components[label].apply_k_matmat(matrix, component)
             for label, component in zip(prior.labels, prior.components)
         )
 
@@ -179,24 +217,34 @@ class MultiComponentOps:
             op = self.components[label]
             if any(chrom.dense is None for chrom in op._chromosomes):
                 identity = np.eye(op.n, dtype=np.float64)
-                result[f"log_sigma_b2[{label}]"] = component.sigma_b2 * op.apply_k_matmat(identity, component)
-                result[f"log_tau[{label}]"] = component.sigma_b2 * op.apply_dh_matmat(identity, component, "log_tau")
+                result[f"log_sigma_b2[{label}]"] = (
+                    component.sigma_b2 * op.apply_k_matmat(identity, component)
+                )
+                result[f"log_tau[{label}]"] = component.sigma_b2 * op.apply_dh_matmat(
+                    identity, component, "log_tau"
+                )
                 continue
-            result[f"log_sigma_b2[{label}]"] = component.sigma_b2 * op.dense_kernel(component)
+            result[f"log_sigma_b2[{label}]"] = component.sigma_b2 * op.dense_kernel(
+                component
+            )
             derivative = component.weight_derivatives(op.frequencies)["log_tau"]
             matrices = []
             offset = 0
             for chrom in op._chromosomes:
                 centered = op.project(chrom.dense)
                 count = chrom.n_variants
-                matrices.append((centered * derivative[offset:offset + count]) @ centered.T)
+                matrices.append(
+                    (centered * derivative[offset : offset + count]) @ centered.T
+                )
                 offset += count
             result[f"log_tau[{label}]"] = component.sigma_b2 * sum(
                 matrices, start=np.zeros((self.n, self.n))
             )
         return result
 
-    def apply_dh_matmat(self, values: np.ndarray, prior: MultiComponentPrior, parameter: str) -> np.ndarray:
+    def apply_dh_matmat(
+        self, values: np.ndarray, prior: MultiComponentPrior, parameter: str
+    ) -> np.ndarray:
         """Apply a component derivative to batched vectors (dense/GRGL path)."""
         matrix = np.asarray(values, dtype=np.float64)
         if matrix.ndim != 2 or matrix.shape[0] != self.n:
@@ -229,7 +277,9 @@ class MultiComponentOps:
             for name in (f"log_sigma_b2[{label}]", f"log_tau[{label}]")
         }
 
-    def apply_shape_matmat(self, values: np.ndarray, prior: MultiComponentPrior) -> np.ndarray:
+    def apply_shape_matmat(
+        self, values: np.ndarray, prior: MultiComponentPrior
+    ) -> np.ndarray:
         """Apply ``H = I + sum_c K_c`` to batched projected vectors."""
         matrix = np.asarray(values, dtype=np.float64)
         if matrix.ndim != 2 or matrix.shape[0] != self.n:
@@ -274,6 +324,9 @@ class MultiComponentFit:
     step_se_norm: float = float("nan")
     newton_decrement: float = float("nan")
     warnings: tuple[str, ...] = ()
+    initialization: str = "default"
+    mom_raw_component_scales: np.ndarray | None = None
+    mom_truncated: np.ndarray | None = None
 
 
 def profiled_reml_objective(
@@ -293,7 +346,9 @@ def profiled_reml_objective(
     if q <= 0.0:
         raise np.linalg.LinAlgError("profiled REML quadratic form is non-positive")
     fixed = ops.basis.T @ inv_shape @ ops.basis
-    objective = 0.5 * (logdet + np.linalg.slogdet(fixed)[1] + ops.dim * np.log(q / ops.dim))
+    objective = 0.5 * (
+        logdet + np.linalg.slogdet(fixed)[1] + ops.dim * np.log(q / ops.dim)
+    )
     return float(objective), float(q / ops.dim)
 
 
@@ -312,6 +367,7 @@ def fit_multicomponent_reml(
     step_se_tol: float = 1e-2,
     max_step: float = 2.0,
     fit_tau: bool = True,
+    initialization: str = "default",
 ) -> MultiComponentFit:
     """Fit by profiled REML.
 
@@ -329,11 +385,22 @@ def fit_multicomponent_reml(
     searches only the ``|c|`` scale coordinates.  That is the pooled-shape mode
     used for per-gene fitting, where the shapes are estimated once across genes
     and must not be re-estimated per gene.
+
+    ``initialization="he"`` applies the joint projected Haseman--Elston
+    ``(|c|+1)`` moment system to the component *scale* coordinates.  The
+    current category-specific ``tau_c`` values are retained: HE is linear in
+    the covariance components conditional on those evolutionary weights and
+    cannot identify the nonlinear shape coordinates by itself.  Raw moment
+    scales and negative-scale flags are retained on the returned fit for the
+    required no-truncation audit; invalid or non-positive values fall back to
+    the requested/default scale for optimisation.
     """
     if method not in ("ai", "dense"):
         raise ValueError("method must be 'ai' or 'dense'")
     if trace_method not in ("hutchinson", "xtrace"):
         raise ValueError("trace_method must be 'hutchinson' or 'xtrace'")
+    if initialization not in ("default", "he"):
+        raise ValueError("initialization must be 'default' or 'he'")
     if (
         trace_probes < 2
         or not np.isfinite(cg_tol)
@@ -343,12 +410,16 @@ def fit_multicomponent_reml(
         or not np.isfinite(max_step)
         or max_step <= 0
     ):
-        raise ValueError("trace_probes must be at least two; tolerances and max_step must be positive")
+        raise ValueError(
+            "trace_probes must be at least two; tolerances and max_step must be positive"
+        )
     values = np.asarray(y, dtype=np.float64)
     if values.shape != (ops.n,) or not np.all(np.isfinite(values)):
         raise ValueError("y must be a finite vector with one entry per individual")
     if initial is None:
-        prior = MultiComponentPrior(tuple(ops.labels), tuple(SimplifiedPrior(1.0, 0.1) for _ in ops.labels))
+        prior = MultiComponentPrior(
+            tuple(ops.labels), tuple(SimplifiedPrior(1.0, 0.1) for _ in ops.labels)
+        )
     elif isinstance(initial, MultiComponentPrior):
         prior = initial
     else:
@@ -356,15 +427,70 @@ def fit_multicomponent_reml(
     if prior.labels != ops.labels:
         raise ValueError("initial prior labels do not match the partition")
 
+    mom_raw_component_scales = None
+    mom_truncated = None
+    if initialization == "he" and ops.n_components > 1:
+        # Import lazily: baselines exposes the public moment helper and imports
+        # this module's partitioned operators.
+        from .baselines import joint_mom_initialization
+
+        moment = joint_mom_initialization(
+            ops,
+            values,
+            prior,
+            trace_method=(
+                "exact"
+                if all(
+                    chrom.dense is not None
+                    for op in ops.components.values()
+                    for chrom in op._chromosomes
+                )
+                else trace_method
+            ),
+            trace_probes=trace_probes,
+            seed=seed,
+        )
+        mom_raw_component_scales = moment.raw_component_scales.copy()
+        mom_truncated = moment.truncated.copy()
+        residual = moment.residual_variance
+        initialized_components = []
+        for component, multiplier in zip(prior.components, moment.raw_component_scales):
+            # The multi-component AI parameterization stores each genetic scale
+            # relative to profiled sigma_e2.  HE returns scientific covariance
+            # multipliers for the supplied component kernels.
+            if (
+                np.isfinite(multiplier)
+                and multiplier > 0.0
+                and np.isfinite(residual)
+                and residual > 0.0
+            ):
+                scale = component.sigma_b2 * float(multiplier) / float(residual)
+            else:
+                scale = component.sigma_b2
+            initialized_components.append(SimplifiedPrior(scale, component.tau))
+        prior = MultiComponentPrior(prior.labels, tuple(initialized_components))
+
     if method == "dense" and not fit_tau:
         raise ValueError("fit_tau=False is implemented on the 'ai' method only")
     # A pooled-shape fit cannot delegate to the single-component fitter: that
     # fitter searches its own tau.
     if method == "ai" and (ops.n_components > 1 or not fit_tau):
         return _fit_multicomponent_ai(
-            ops, values, prior, max_iter=max_iter, trace_method=trace_method,
-            trace_probes=trace_probes, seed=seed, cg_tol=cg_tol, tol=tol,
-            step_se_tol=step_se_tol, max_step=max_step, fit_tau=fit_tau,
+            ops,
+            values,
+            prior,
+            max_iter=max_iter,
+            trace_method=trace_method,
+            trace_probes=trace_probes,
+            seed=seed,
+            cg_tol=cg_tol,
+            tol=tol,
+            step_se_tol=step_se_tol,
+            max_step=max_step,
+            fit_tau=fit_tau,
+            initialization=initialization,
+            mom_raw_component_scales=mom_raw_component_scales,
+            mom_truncated=mom_truncated,
         )
 
     # The one-category model is exactly the existing single-component model;
@@ -374,21 +500,40 @@ def fit_multicomponent_reml(
     # ``cg_tol`` instead of being forced to materialise dense kernels.
     if ops.n_components == 1:
         from .reml import fit_reml
+
         label = ops.labels[0]
-        single = fit_reml(ops.components[label], values, initial=prior.components[0],
-                          max_iter=max_iter, trace_method=trace_method,
-                          trace_probes=trace_probes, seed=seed, cg_tol=cg_tol, tol=tol,
-                          max_step=max_step)
+        single = fit_reml(
+            ops.components[label],
+            values,
+            initial=prior.components[0],
+            max_iter=max_iter,
+            trace_method=trace_method,
+            trace_probes=trace_probes,
+            seed=seed,
+            cg_tol=cg_tol,
+            tol=tol,
+            max_step=max_step,
+            initialization=initialization,
+        )
         fitted = MultiComponentPrior((label,), (single.prior,))
-        return MultiComponentFit(fitted, single.sigma_e2, single.h2, single.diagnostics.objective,
-                                 single.diagnostics.converged, ops,
-                                 trace_method=trace_method, trace_probes=trace_probes,
-                                 cg_tol=cg_tol, score_norm=single.diagnostics.score_norm,
-                                 phenotype=values.copy(),
-                                 status=single.diagnostics.status,
-                                 step_se_norm=single.diagnostics.step_se_norm,
-                                 newton_decrement=single.diagnostics.newton_decrement,
-                                 warnings=_tau_warnings(ops, fitted))
+        return MultiComponentFit(
+            fitted,
+            single.sigma_e2,
+            single.h2,
+            single.diagnostics.objective,
+            single.diagnostics.converged,
+            ops,
+            trace_method=trace_method,
+            trace_probes=trace_probes,
+            cg_tol=cg_tol,
+            score_norm=single.diagnostics.score_norm,
+            phenotype=values.copy(),
+            status=single.diagnostics.status,
+            step_se_norm=single.diagnostics.step_se_norm,
+            newton_decrement=single.diagnostics.newton_decrement,
+            warnings=_tau_warnings(ops, fitted),
+            initialization=initialization,
+        )
     coordinates = prior.coordinates.copy()
     finite = np.isfinite(coordinates)
     coordinates[~finite] = np.log(np.finfo(float).tiny)
@@ -404,12 +549,22 @@ def fit_multicomponent_reml(
         sigma_e2 = q / d
         fixed = ops.basis.T @ inv_shape @ ops.basis
         objective = 0.5 * (logdet + np.linalg.slogdet(fixed)[1] + d * np.log(q / d))
-        scaled = tuple(SimplifiedPrior(sigma_e2 * p.sigma_b2, p.tau) for p in current.components)
-        return float(objective), float(sigma_e2), MultiComponentPrior(current.labels, scaled)
+        scaled = tuple(
+            SimplifiedPrior(sigma_e2 * p.sigma_b2, p.tau) for p in current.components
+        )
+        return (
+            float(objective),
+            float(sigma_e2),
+            MultiComponentPrior(current.labels, scaled),
+        )
 
-    result = minimize(lambda theta: evaluate(theta)[0], coordinates, method="L-BFGS-B",
-                      bounds=[(-30.0, 30.0), (-30.0, 30.0)] * ops.n_components,
-                      options={"maxiter": int(max_iter), "ftol": 1e-12})
+    result = minimize(
+        lambda theta: evaluate(theta)[0],
+        coordinates,
+        method="L-BFGS-B",
+        bounds=[(-30.0, 30.0), (-30.0, 30.0)] * ops.n_components,
+        options={"maxiter": int(max_iter), "ftol": 1e-12},
+    )
     objective, sigma_e2, fitted = evaluate(result.x)
     kernel = ops.dense_kernel(fitted)
     genetic = float(np.trace(kernel))
@@ -425,17 +580,34 @@ def fit_multicomponent_reml(
                 standard_errors[f"log_tau[{label}]"] = float(diagonal[2 * index + 1])
         except (AttributeError, ValueError):
             covariance = None
-    return MultiComponentFit(fitted, sigma_e2, h2, objective, bool(result.success), ops,
-                             covariance, standard_errors, trace_method, trace_probes, cg_tol,
-                             phenotype=values.copy(),
-                             status="optimizer_success" if result.success else "optimizer_failure",
-                             warnings=_tau_warnings(ops, fitted))
+    return MultiComponentFit(
+        fitted,
+        sigma_e2,
+        h2,
+        objective,
+        bool(result.success),
+        ops,
+        covariance,
+        standard_errors,
+        trace_method,
+        trace_probes,
+        cg_tol,
+        phenotype=values.copy(),
+        status="optimizer_success" if result.success else "optimizer_failure",
+        warnings=_tau_warnings(ops, fitted),
+        initialization=initialization,
+        mom_raw_component_scales=mom_raw_component_scales,
+        mom_truncated=mom_truncated,
+    )
 
 
 def coordinate_names(labels: Sequence[Any]) -> list[str]:
     """Return the transformed coordinate names in prior order."""
-    return [name for label in labels for name in
-            (f"log_sigma_b2[{label}]", f"log_tau[{label}]")]
+    return [
+        name
+        for label in labels
+        for name in (f"log_sigma_b2[{label}]", f"log_tau[{label}]")
+    ]
 
 
 def projected_solve(
@@ -480,7 +652,7 @@ def projected_solve(
             alpha = np.linalg.lstsq(gram, rr, rcond=None)[0]
             x += direction @ alpha
             residual -= applied @ alpha
-            if np.all(np.sum(residual * residual, axis=0) <= scale * cg_tol ** 2):
+            if np.all(np.sum(residual * residual, axis=0) <= scale * cg_tol**2):
                 return x
             new_rr = residual.T @ residual
             beta = np.linalg.lstsq(rr, new_rr, rcond=None)[0]
@@ -488,17 +660,24 @@ def projected_solve(
         # Dependent probe columns can make block Gram systems rank-deficient;
         # retain a strict fallback for those rare cases.
         for column in range(rhs_block.shape[1]):
-            solution, info = cg(operator, rhs_block[:, column], rtol=cg_tol, atol=0.0,
-                                maxiter=max(50, 4 * ops.n))
+            solution, info = cg(
+                operator,
+                rhs_block[:, column],
+                rtol=cg_tol,
+                atol=0.0,
+                maxiter=max(50, 4 * ops.n),
+            )
             if info != 0:
-                raise np.linalg.LinAlgError(f"multi-component CG failed with info={info}")
+                raise np.linalg.LinAlgError(
+                    f"multi-component CG failed with info={info}"
+                )
             x[:, column] = solution
         return x
 
     solutions = block_cg(combined_rhs)
-    basis_solution = solutions[:, :ops.rank]
+    basis_solution = solutions[:, : ops.rank]
     fixed = ops.basis.T @ basis_solution
-    target = solutions[:, ops.rank:]
+    target = solutions[:, ops.rank :]
     correction = basis_solution @ np.linalg.solve(fixed, ops.basis.T @ target)
     result = target - correction
     return result[:, 0] if was_vector else result
@@ -542,7 +721,9 @@ def score_and_information(
         raise ValueError("trace_method must be 'hutchinson' or 'xtrace'")
     names = coordinate_names(ops.labels)
     tiny = np.finfo(float).tiny
-    solved = projected_solve(ops, np.column_stack((values, probe_matrix)), prior, cg_tol=cg_tol)
+    solved = projected_solve(
+        ops, np.column_stack((values, probe_matrix)), prior, cg_tol=cg_tol
+    )
     ph_y = solved[:, 0]
     ph_probes = solved[:, 1:]
     q = float(values @ ph_y)
@@ -572,8 +753,11 @@ def score_and_information(
         # columns of the single block solve above are reused unchanged.
         samples = np.sum(ph_probes * derivatives[name][:, 1:], axis=0)
         traces[index] = float(np.mean(samples))
-        trace_errors.append(float(np.std(samples, ddof=1) / np.sqrt(samples.size))
-                            if samples.size > 1 else 0.0)
+        trace_errors.append(
+            float(np.std(samples, ddof=1) / np.sqrt(samples.size))
+            if samples.size > 1
+            else 0.0
+        )
     score = 0.5 * (data / max(sigma_e2, tiny) - traces)
     ai = None
     if information:
@@ -585,8 +769,15 @@ def score_and_information(
         ai = (direct - np.outer(data, data) / (2.0 * q)) / max(sigma_e2, tiny)
         ai = (ai + ai.T) * 0.5
     return {
-        "names": names, "prior": prior, "ph_y": ph_y, "q": q, "sigma_e2": sigma_e2,
-        "data": data, "traces": traces, "score": score, "ai": ai,
+        "names": names,
+        "prior": prior,
+        "ph_y": ph_y,
+        "q": q,
+        "sigma_e2": sigma_e2,
+        "data": data,
+        "traces": traces,
+        "score": score,
+        "ai": ai,
         "trace_error": float(max(trace_errors, default=0.0)),
     }
 
@@ -655,6 +846,9 @@ def _fit_multicomponent_ai(
     max_step: float,
     step_se_tol: float = 1e-2,
     fit_tau: bool = True,
+    initialization: str = "default",
+    mom_raw_component_scales: np.ndarray | None = None,
+    mom_truncated: np.ndarray | None = None,
 ) -> MultiComponentFit:
     """Projected AI-REML with profiled residual scale and batched probes.
 
@@ -665,12 +859,13 @@ def _fit_multicomponent_ai(
     """
     coords = initial.coordinates.copy()
     coords[~np.isfinite(coords)] = np.log(np.finfo(float).tiny)
-    probes = (rademacher_probes(ops.n, trace_probes, seed)
-              if trace_method == "hutchinson"
-              else spherical_gaussian_probes(ops.n, trace_probes, seed))
+    probes = (
+        rademacher_probes(ops.n, trace_probes, seed)
+        if trace_method == "hutchinson"
+        else spherical_gaussian_probes(ops.n, trace_probes, seed)
+    )
     names = coordinate_names(ops.labels)
-    active = (np.arange(len(names)) if fit_tau
-              else np.arange(0, len(names), 2))
+    active = np.arange(len(names)) if fit_tau else np.arange(0, len(names), 2)
     converged = False
     status = "not_started"
     covariance = None
@@ -684,8 +879,13 @@ def _fit_multicomponent_ai(
 
     def evaluate(current: np.ndarray, *, information: bool = True) -> dict[str, Any]:
         state = score_and_information(
-            ops, y, MultiComponentPrior.from_coordinates(ops.labels, current), probes,
-            trace_method=trace_method, cg_tol=cg_tol, information=information,
+            ops,
+            y,
+            MultiComponentPrior.from_coordinates(ops.labels, current),
+            probes,
+            trace_method=trace_method,
+            cg_tol=cg_tol,
+            information=information,
         )
         state["coords"] = current
         return state
@@ -721,10 +921,15 @@ def _fit_multicomponent_ai(
         if last_step_se <= step_se_tol:
             converged = True
             status = "converged"
-            covariance = _embed(np.linalg.pinv(ai + damping * np.eye(active.size)), active, len(names))
+            covariance = _embed(
+                np.linalg.pinv(ai + damping * np.eye(active.size)), active, len(names)
+            )
             break
         if not np.all(np.isfinite(ai)) or np.linalg.cond(ai) > 1e12:
-            damping = max(damping, 1e-8 * max(float(np.trace(np.abs(ai))) / max(active.size, 1), 1.0))
+            damping = max(
+                damping,
+                1e-8 * max(float(np.trace(np.abs(ai))) / max(active.size, 1), 1.0),
+            )
         trial_ai = ai + damping * np.eye(active.size)
         try:
             step = np.linalg.solve(trial_ai, score)
@@ -739,15 +944,15 @@ def _fit_multicomponent_ai(
         for halving in range(10):
             trial_coords = coords.copy()
             trial_coords[active] = np.clip(
-                coords[active] + step * (0.5 ** halving), -30.0, 30.0
+                coords[active] + step * (0.5**halving), -30.0, 30.0
             )
             trial = evaluate(trial_coords)
             new_norm = float(np.linalg.norm(trial["score"][active] / scaling))
-            if new_norm <= old_norm or np.max(np.abs(step)) * (0.5 ** halving) <= tol:
+            if new_norm <= old_norm or np.max(np.abs(step)) * (0.5**halving) <= tol:
                 coords = trial_coords
                 accepted = True
                 pending = trial
-                last_step = float(np.max(np.abs(step)) * (0.5 ** halving))
+                last_step = float(np.max(np.abs(step)) * (0.5**halving))
                 break
         if not accepted:
             # The step was rejected, but this iteration's point is a valid
@@ -778,22 +983,39 @@ def _fit_multicomponent_ai(
     # round trip exactly instead of within one ulp.
     fitted = MultiComponentPrior(
         ops.labels,
-        tuple(SimplifiedPrior(last_sigma_e2 * component.sigma_b2,
-                              component.tau if fit_tau else initial.components[index].tau)
-              for index, component in enumerate(last_prior.components)),
+        tuple(
+            SimplifiedPrior(
+                last_sigma_e2 * component.sigma_b2,
+                component.tau if fit_tau else initial.components[index].tau,
+            )
+            for index, component in enumerate(last_prior.components)
+        ),
     )
     genetic = ops.kernel_trace(fitted)
     h2 = genetic / max(genetic + ops.dim * last_sigma_e2, np.finfo(float).tiny)
-    errors = None if covariance is None else {
-        name: float(np.sqrt(max(covariance[index, index], 0.0)))
-        for index, name in enumerate(names)
-    }
+    errors = (
+        None
+        if covariance is None
+        else {
+            name: float(np.sqrt(max(covariance[index, index], 0.0)))
+            for index, name in enumerate(names)
+        }
+    )
     # The AI path does not evaluate a stochastic log-determinant objective;
     # expose a finite score diagnostic in the common ``objective`` slot.
     objective = float(0.5 * np.dot(last_score[active], last_score[active]))
     return MultiComponentFit(
-        fitted, last_sigma_e2, h2, objective, converged, ops, covariance, errors,
-        trace_method, trace_probes, cg_tol,
+        fitted,
+        last_sigma_e2,
+        h2,
+        objective,
+        converged,
+        ops,
+        covariance,
+        errors,
+        trace_method,
+        trace_probes,
+        cg_tol,
         float(np.linalg.norm(last_score[active], ord=np.inf)),
         last_trace_error,
         y.copy(),
@@ -803,4 +1025,7 @@ def _fit_multicomponent_ai(
         float(last_step_se),
         float(last_decrement),
         _tau_warnings(ops, fitted),
+        initialization,
+        mom_raw_component_scales,
+        mom_truncated,
     )
