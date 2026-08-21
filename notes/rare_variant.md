@@ -128,14 +128,14 @@ exaggeration. Pre-register that direction.
 
 | Aspect | RareEffect | evo-lmm | Reanalysis consequence |
 | --- | --- | --- | --- |
-| Effect-variance prior | flat within category ($`\tau_c I`$) | $`\sigma_{b,c}^2 / (1 + 2\tau_c q_j)`$ | nested at $`\tau_c = 0`$; LRT available |
-| Frequency dependence | none | mechanistic, saturating as $`q \to 0`$ | reallocates variance **within** the rare window |
-| Shape parameters per gene | 3 free $`\tau_c`$ | 3 scales, with $`\tau_c`$ pooled across genes | fewer per-gene parameters |
+| Effect-variance prior | flat within category ($\tau_c I$) | $\sigma_{b,c}^2 / (1 + 2\tau_c q_j)$ | nested at $\tau_c = 0$; LRT available |
+| Frequency dependence | none | mechanistic, saturating as $q \to 0$ | reallocates variance **within** the rare window |
+| Shape parameters per gene | 3 free $\tau_c$ | 3 scales, with $\tau_c$ pooled across genes | fewer per-gene parameters |
 | Ultrarare (MAC<10) | collapsed to one burden column | modeled individually; prior supplies shrinkage | collapsing is where "new mutation" contributions are decided |
 | Cross-category LD | marginal ML + MoM ratio, truncation fallback | joint multi-component REML | removes a data-dependent selection rule |
 | Covariates | residualized in step 1 | projected inside the fit | two-stage attenuation is testable |
-| Estimand denominator | $`n\psi`$, uncentered $`\mathrm{tr}(G\Sigma G^{\top})`$ | $`d\sigma_e^2`$, projected trace | $`O(\hat{x})`$ for rare variants; still must be aligned exactly |
-| Reported new quantity | — | $`\sigma_{b,c}^2`$ (mutational scale), $`\tau_c`$ (composite, §2.1) | per-annotation architecture parameters |
+| Estimand denominator | $n\psi$, uncentered $\mathrm{tr}(G\Sigma G^{\top})$ | $d\sigma_e^2$, projected trace | $O(\hat{x})$ for rare variants; still must be aligned exactly |
+| Reported new quantity | — | $\sigma_{b,c}^2$ (mutational scale), $\tau_c$ (composite, §2.1) | per-annotation architecture parameters |
 
 ---
 
@@ -247,11 +247,11 @@ identified quantity. Write the manuscript around $\sigma_{b,c}^2$, not $\tau_c$.
 Fitting proceeds up an explicit nesting ladder rather than straight to the most
 general model. Coordinates are counted after profiling one scale.
 
-| Model | Prior | Searched shape coordinates ($`|c| = 3`$) | Interpretation |
+| Model | Prior | Searched shape coordinates ($\lvert c \rvert = 3$) | Interpretation |
 | --- | --- | --- | --- |
-| **M0** | $`\tau_c = 0`$, per-class scale | 3 | RareEffect's prior, exactly |
-| **M1** | shared $`\tau`$, per-class scale | 4 | parsimonious, **mechanistically wrong** (requires $`\rho_c^2\sigma_{a,c}^2/k_c`$ equal across classes); an identifiability crutch, labeled as such |
-| **M2** | per-class $`\tau_c`$, per-class scale | 6 | the correct partitioned model of §2.1 |
+| **M0** | $\tau_c = 0$, per-class scale | 3 | RareEffect's prior, exactly |
+| **M1** | shared $\tau$, per-class scale | 4 | parsimonious, **mechanistically wrong** (requires $\rho_c^2\sigma_{a,c}^2/k_c$ equal across classes); an identifiability crutch, labeled as such |
+| **M2** | per-class $\tau_c$, per-class scale | 6 | the correct partitioned model of §2.1 |
 
 M0 vs M1 is the RareEffect test. M1 vs M2 is the scientifically interesting
 test: does the composite differ by annotation class? Report both, and report M1
@@ -266,10 +266,10 @@ to be climbed if M2 fits well.
 Within MAF $\le 1\%$, $q \le q_{\max} = 0.0099$, so the dynamic range of the
 weight across the entire window is $1 + 2\tau_c q_{\max}$:
 
-| $`\tau_c`$ | $`2\tau_c q_{\max}`$ | prior-variance range across MAF $`\le 1\%`$ |
+| $\tau_c$ | $2\tau_c q_{\max}$ | prior-variance range across MAF $\le 1\%$ |
 | --- | --- | --- |
 | 1 | 0.02 | 1.02x — indistinguishable from flat |
-| 10 | 0.20 | 1.2x — detectable at $`n \sim 4\times10^5`$, small effect on $`h^2`$ |
+| 10 | 0.20 | 1.2x — detectable at $n \sim 4\times10^5$, small effect on $h^2$ |
 | 100 | 1.98 | 3.0x — material misallocation across the window |
 | 1000 | 19.8 | 21x — flat prior badly misspecified |
 
@@ -551,8 +551,8 @@ gnomAD-matched AFS serves as a cheap replicate generator.
 | A | yes | yes | M0 flat per category | marginal ML + MoM ratio + truncation |
 | B | yes | yes | M0 flat per category | joint REML |
 | C | no | no | M0 flat per category | joint REML |
-| D | no | no | M1 shared $`\tau`$ | joint REML |
-| E | no | no | M2 per-class $`\tau_c`$ | joint REML |
+| D | no | no | M1 shared $\tau$ | joint REML |
+| E | no | no | M2 per-class $\tau_c$ | joint REML |
 
 Arm A is RareEffect as published. A$\to$B$\to$C$\to$E is a clean ablation path
 that **attributes the total bias to individual design choices** — that
@@ -640,7 +640,7 @@ verification setting.
 | Small deterministic tests | Module-aligned files under `tests/`, especially `test_multicomponent.py`, `test_baselines.py`, and `test_reporting.py` |
 | Large-scale recovery and runtime evidence | Persisted workflows under `benchmarks/`; deliberately not duplicated in pytest |
 | Simulation study | `docs/tutorials/` + persisted artifacts, following the SLiM tutorial pattern |
-| Model invariants: per-class $`\tau_c`$, shared $`W_S`$, composite reading of $`\hat{\tau}_c`$, $`\rho_{ab} \equiv 1`$ | `AGENTS.md` |
+| Model invariants: per-class $\tau_c$, shared $W_S$, composite reading of $\hat{\tau}_c$, $\rho_{ab} \equiv 1$ | `AGENTS.md` |
 | Manuscript | separate repository |
 
 ---

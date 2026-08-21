@@ -109,9 +109,9 @@ $$
 
 | | GRAPP | evo-lmm |
 | --- | --- | --- |
-| searched coordinates | $`\log \delta`$ (1) | $`(\log \delta, \log \tau)`$ (2, simplified) or $`(\log \delta, \log \tau, \mathrm{logit}\,\rho^2)`$ (3, full) |
-| profiled scale | $`\sigma_g^2`$ | $`\sigma_b^2`$ |
-| kernel shape | fixed | **estimated** ($`\tau`$, and $`\rho^2`$ in the full model) |
+| searched coordinates | $\log \delta$ (1) | $(\log \delta, \log \tau)$ (2, simplified) or $(\log \delta, \log \tau, \mathrm{logit}\,\rho^2)$ (3, full) |
+| profiled scale | $\sigma_g^2$ | $\sigma_b^2$ |
+| kernel shape | fixed | **estimated** ($\tau$, and $\rho^2$ in the full model) |
 
 This is the structural difference from which most of the others follow. GRAPP
 solves a one-dimensional root-finding problem in $\log \delta$ with a fixed
@@ -244,13 +244,13 @@ The tolerance is loose by design: `cg_tol = 5e-4`.
 
 | Symbol | Keyword | Default | Where |
 | --- | --- | --- | --- |
-| $`T`$, MC replicates | `mc_trials` | `0` $`\Rightarrow`$ auto: $`T = \max(\min(\lfloor 4\times10^9 / N^2 \rfloor, 15), 3)`$; a positive value is clamped to $`\ge 2`$ | `DEFAULT_H2_EST_MC_TRIALS`, `fit_bolt_variance_components:942` |
+| $T$, MC replicates | `mc_trials` | `0` $\Rightarrow$ auto: $T = \max(\min(\lfloor 4\times10^9 / N^2 \rfloor, 15), 3)$; a positive value is clamped to $\ge 2$ | `DEFAULT_H2_EST_MC_TRIALS`, `fit_bolt_variance_components:942` |
 | CG relative tolerance | `cg_tol` | `5e-4` | `DEFAULT_CG_TOL` |
 | CG iteration cap | `max_iter` | `10000` (no error on exhaustion) | `DEFAULT_MAX_ITERS` |
 | probe seed | `seed` | `12345` in the core (`BOLT_RANDOM_SEED`); the CLI passes `42`. MC probes use `seed + 1`; calibration selection uses `seed + 321` | `bolt_inf_core.py:33`, `cli/bolt_lmm_cli.py` |
-| secant step cap | — | 5 steps, $`\log \delta`$ clipped to $`[-10, 10]`$ | `fit_bolt_variance_components` |
-| secant exit | — | best-point rule with $`\lvert \Delta \log \delta \rvert < 0.01`$ | same |
-| bracket start | — | $`h^2 = 0.25`$, then $`0.125`$ or $`0.5`$ | same |
+| secant step cap | — | 5 steps, $\log \delta$ clipped to $[-10, 10]$ | `fit_bolt_variance_components` |
+| secant exit | — | best-point rule with $\lvert \Delta \log \delta \rvert < 0.01$ | same |
+| bracket start | — | $h^2 = 0.25$, then $0.125$ or $0.5$ | same |
 | calibration variants | `num_calib_snps` | `30` | `DEFAULT_NUM_CALIB_SNPS` |
 | threads | `threads` / `-j` | `1` | `bolt_lmm_inf` |
 
@@ -386,7 +386,7 @@ Each iteration:
    trial is a full re-evaluation, so one iteration can cost up to 12
    evaluations.
 6. If nothing is accepted, raise $\lambda$; declare convergence anyway if
-   $\lVert s \rVert_\infty \le 10\,$`tol`.
+   $\lVert s \rVert_\infty \le 10\,\mathtt{tol}$.
 
 On the exact dense path only, a non-converged run is finished by
 `scipy.optimize.minimize(method="L-BFGS-B")` on $\ell(\phi)$ with the analytic
@@ -406,7 +406,8 @@ every point listed in §2.5:
 - **Synchronised multi-RHS CG with active-column masking**: a column that
   reaches its target leaves the active set and stops being multiplied.
 - **Per-column relative target**
-  $\lVert r \rVert^2 \le \max(\lVert r_0 \rVert^2, 1) \cdot$ `cg_tol`$^2$,
+  $\lVert r \rVert^2 \le \max(\lVert r_0 \rVert^2, 1) \cdot
+  \mathtt{cg\_tol}^2$,
   with `cg_tol = 5e-4` by default, deliberately set to GRAPP's value so the
   two solvers do comparable work per application. Tighter tolerances may be
   used only by explicit numerical-oracle tests; they are not the reportable
@@ -448,40 +449,40 @@ guess and records a warning. The default remains `"default"`.
 
 | Symbol | Keyword | Default | Where |
 | --- | --- | --- | --- |
-| $`S`$, trace probes | `trace_probes` | `12`, clamped to $`\ge 2`$; ignored when `exact` | `fit_reml:390` |
-| trace estimator | `trace_method` | `"hutchinson"` (Rademacher); `"xtrace"` uses spherical Gaussian probes of radius $`\sqrt{N}`$ and $`2S`$ queries | `trace.py` |
-| exact traces | `exact` | `None` $`\Rightarrow`$ `True` iff every chromosome is dense | `fit_reml` |
-| probe seed | `seed` | `0`; probes drawn once per fit and reused at every $`\phi`$ | `rademacher_probes:21` |
+| $S$, trace probes | `trace_probes` | `12`, clamped to $\ge 2$; ignored when `exact` | `fit_reml:390` |
+| trace estimator | `trace_method` | `"hutchinson"` (Rademacher); `"xtrace"` uses spherical Gaussian probes of radius $\sqrt{N}$ and $2S$ queries | `trace.py` |
+| exact traces | `exact` | `None` $\Rightarrow$ `True` iff every chromosome is dense | `fit_reml` |
+| probe seed | `seed` | `0`; probes drawn once per fit and reused at every $\phi$ | `rademacher_probes:21` |
 | CG relative tolerance | `cg_tol` | `5e-4`, per column, error on non-convergence | `solve_ph:679` |
-| CG iteration cap | — | $`\max(50, 4N)`$ | `solve_ph` |
+| CG iteration cap | — | $\max(50, 4N)$ | `solve_ph` |
 | warm starts | `warm_start` | `True`, with per-column revalidation and accepted/trial cache isolation | `solve_ph`, `_quantities` |
 | Newton iterations | `max_iter` | `50` accepted iterations | `fit_reml` |
-| score tolerance | `tol` | `1e-6` on $`\lVert s \rVert_\infty`$ | `fit_reml` |
+| score tolerance | `tol` | `1e-6` on $\lVert s \rVert_\infty$ | `fit_reml` |
 | step cap | `max_step` | `2.0` in transformed coordinates | `fit_reml` |
-| step halvings | — | 12 per iteration ($`2^{-k}`$, $`k \le 11`$) | `fit_reml` |
-| AI damping | — | starts $`10^{-6}`$, $`\times 10`$ per failure; forced when $`\mathrm{cond} > 10^{12}`$ | `fit_reml` |
-| initialization | `initialization` | `"default"`; `"he"` sets the starting $`\delta`$ only | `haseman_elston_initialization:659` |
+| step halvings | — | 12 per iteration ($2^{-k}$, $k \le 11$) | `fit_reml` |
+| AI damping | — | starts $10^{-6}$, $\times 10$ per failure; forced when $\mathrm{cond} > 10^{12}$ | `fit_reml` |
+| initialization | `initialization` | `"default"`; `"he"` sets the starting $\delta$ only | `haseman_elston_initialization:659` |
 | dense finishing | — | L-BFGS-B, `ftol=1e-12`, `gtol=tol`, `maxiter=4*max_iter`, exact path only | `fit_reml` |
 
 ## 4. Side-by-side
 
 | Aspect | GRAPP BOLT-LMM-inf | evo-lmm AI-REML |
 | --- | --- | --- |
-| Estimated shape parameters | $`\log \delta`$ only | $`\log \delta, \log \tau`$ (+ $`\mathrm{logit}\,\rho^2`$) |
-| Kernel | fixed, standardized, $`1/M`$-normalized | estimated frequency weighting, raw dosage, no $`1/M`$ |
-| Criterion | root of the MC-scaling function $`f(\log\delta)`$ | stationary point of the profiled restricted likelihood |
-| Uses derivatives of $`K`$? | no | yes, analytic $`\partial K / \partial \tau`$, $`\partial K / \partial \rho^2`$ |
-| Role of randomness | simulate $`T`$ replicate phenotypes under the current model | estimate $`\mathrm{tr}(P_H \partial_i H)`$ by Hutchinson |
+| Estimated shape parameters | $\log \delta$ only | $\log \delta, \log \tau$ (+ $\mathrm{logit}\,\rho^2$) |
+| Kernel | fixed, standardized, $1/M$-normalized | estimated frequency weighting, raw dosage, no $1/M$ |
+| Criterion | root of the MC-scaling function $f(\log\delta)$ | stationary point of the profiled restricted likelihood |
+| Uses derivatives of $K$? | no | yes, analytic $\partial K / \partial \tau$, $\partial K / \partial \rho^2$ |
+| Role of randomness | simulate $T$ replicate phenotypes under the current model | estimate $\mathrm{tr}(P_H \partial_i H)$ by Hutchinson |
 | Randomness reused across the search? | yes (drawn once, `seed + 1`) | yes (drawn once, `seed`) |
-| Search method | 1-D secant, $`\le 5`$ steps, clipped to $`[-10,10]`$ | damped Newton with step cap and $`\le 12`$ halvings |
-| Convergence rule | best point and $`\lvert \Delta \log \delta \rvert < 0.01`$; otherwise warn and accept | $`\lVert s\rVert_\infty \le 10^{-6}`$; otherwise `converged = False` |
+| Search method | 1-D secant, $\le 5$ steps, clipped to $[-10,10]$ | damped Newton with step cap and $\le 12$ halvings |
+| Convergence rule | best point and $\lvert \Delta \log \delta \rvert < 0.01$; otherwise warn and accept | $\lVert s\rVert_\infty \le 10^{-6}$; otherwise `converged = False` |
 | Non-convergence behaviour | warns, returns best iterate | flags `converged=False` in diagnostics; exact path retries with L-BFGS-B |
 | Likelihood value available? | never | yes on the exact path, `nan` matrix-free |
-| Uncertainty reported | delete-one jackknife of $`f`$; `CgStats` | per-coordinate trace standard errors, AI condition, damping, CG residual norms |
+| Uncertainty reported | delete-one jackknife of $f$; `CgStats` | per-coordinate trace standard errors, AI condition, damping, CG residual norms |
 | CG tolerance | `5e-4`, relative, batch-wide | `5e-4`, relative, per column (same value, different stopping rule) |
 | CG failure | silent, records residual | raises, optimizer damps and retries |
 | Warm starts | none | default, with revalidation |
-| Evaluations per fit | $`\le 7`$ | $`\le`$ `max_iter` accepted, each up to 12 trials |
+| Evaluations per fit | $\le 7$ | $\le$ `max_iter` accepted, each up to 12 trials |
 
 ## 5. Cost per evaluation
 
