@@ -10,7 +10,7 @@ from scipy.optimize import minimize
 
 from .operators import EvolutionaryLmmOps
 from .priors import EvolutionaryPrior, FullPrior, SimplifiedPrior, prior_from_coordinates
-from .results import FitDiagnostics, FitResult
+from .results import CONVERGED_STATUSES, ConvergenceReport, FitDiagnostics, FitResult
 from .trace import TraceEstimate, rademacher_probes, spherical_gaussian_probes, xtrace
 
 
@@ -217,7 +217,37 @@ def psd_pseudo_inverse(matrix: np.ndarray, rcond: float = 1e-12) -> tuple[np.nda
     return (vectors * inverted) @ vectors.T, int(np.count_nonzero(keep))
 
 
-def convergence_statistics(score: np.ndarray, ai: np.ndarray) -> tuple[float, float]:
+COORDINATE_BOUND = 30.0
+"""Half-width of the log-coordinate box every optimizer here clips to."""
+
+
+def unidentified_coordinates(
+    ai: np.ndarray, *, se_limit: float = 2.0 * COORDINATE_BOUND
+) -> np.ndarray:
+    """Mask the coordinates the information matrix does not locate.
+
+    A coordinate whose standard error exceeds ``se_limit`` -- by default the
+    full width of the ``+/-COORDINATE_BOUND`` log box the optimizers clip to --
+    is not placed anywhere inside its own parameterization by the data.  So is
+    a coordinate the pseudo-inverse drops entirely.  On a pure-null panel these
+    standard errors run to ``1e5``-``1e10`` log units, so the distinction is not
+    marginal.
+    """
+    matrix = np.asarray(ai, dtype=np.float64)
+    if matrix.size == 0:
+        return np.zeros(0, dtype=bool)
+    if not np.all(np.isfinite(matrix)):
+        return np.ones(matrix.shape[0], dtype=bool)
+    inverse, retained = psd_pseudo_inverse(matrix)
+    if retained == 0:
+        return np.ones(matrix.shape[0], dtype=bool)
+    standard_errors = np.sqrt(np.maximum(np.diag(inverse), 0.0))
+    return ~((standard_errors > 0.0) & (standard_errors <= float(se_limit)))
+
+
+def convergence_statistics(
+    score: np.ndarray, ai: np.ndarray, *, se_limit: float = 2.0 * COORDINATE_BOUND
+) -> tuple[float, float]:
     """Return the scale-free convergence statistics ``(step_se_norm, decrement)``.
 
     ``step_se_norm = max_i |step_i| / SE_i`` with ``step = AI^-1 score`` and
@@ -233,13 +263,19 @@ def convergence_statistics(score: np.ndarray, ai: np.ndarray) -> tuple[float, fl
     ``sqrt(n)``.  A fixed absolute score tolerance therefore demands getting
     ``sqrt(n)`` times closer as data are added, which is why it is not the gate.
 
-    Both statistics see only the directions the information matrix actually
-    identifies (see :func:`psd_pseudo_inverse`).  A rank-deficient information
-    matrix is *not* treated as converged: if no direction survives the cutoff,
-    or the score has a component the pseudo-inverse cannot resolve, the result
-    is ``inf``.  A score component lying in a genuinely unidentified direction
-    is invisible to any curvature-based rule; it surfaces through the boundary
-    warnings and ``ai_condition`` instead.
+    The statistic is taken over the coordinates the information matrix locates;
+    :func:`unidentified_coordinates` masks the rest, and a fit carrying any of
+    them reports ``status="unidentified"`` so the value is not read as an
+    estimate.  Excluding them is not leniency: where the standard error is
+    ``1e10`` log units, score-over-information is numerical noise divided by
+    numerical noise, and thresholding it reports the floating-point floor rather
+    than the fit.
+
+    When *no* coordinate is identified the result is ``inf``, not zero: an
+    iteration must never stop because its information matrix was momentarily
+    unusable.  That case is named by the ``unidentified`` status once the fit is
+    over, not treated as convergence mid-loop.  Non-finite input also returns
+    ``inf``.
     """
     values = np.asarray(score, dtype=np.float64)
     matrix = np.asarray(ai, dtype=np.float64)
@@ -250,19 +286,14 @@ def convergence_statistics(score: np.ndarray, ai: np.ndarray) -> tuple[float, fl
     inverse, retained = psd_pseudo_inverse(matrix)
     if retained == 0:
         return float("inf"), float("inf")
+    if np.any(np.diag(inverse) < 0.0):
+        return float("inf"), float("inf")
+    identified = ~unidentified_coordinates(matrix, se_limit=se_limit)
+    if not np.any(identified):
+        return float("inf"), float("inf")
     step = inverse @ values
-    variances = np.diag(inverse)
-    if np.any(variances < 0.0):
-        return float("inf"), float("inf")
-    standard_errors = np.sqrt(variances)
-    ratios = np.zeros_like(step)
-    informative = standard_errors > 0.0
-    ratios[informative] = np.abs(step[informative]) / standard_errors[informative]
-    # A coordinate with no standard error is unidentified, not converged: only
-    # a coordinate the step also leaves untouched may be scored as zero.
-    unresolved = ~informative & (np.abs(step) > 0.0)
-    if np.any(unresolved):
-        return float("inf"), float("inf")
+    standard_errors = np.sqrt(np.maximum(np.diag(inverse), 0.0))
+    ratios = np.abs(step[identified]) / standard_errors[identified]
     decrement = float(np.sqrt(max(float(values @ inverse @ values), 0.0)))
     return float(np.max(ratios)), decrement
 
@@ -671,17 +702,21 @@ def fit_reml(
         result = minimize(objective, optimizer_coords, jac=jac, method="L-BFGS-B", bounds=bounds, options={"maxiter": max_iter * 4, "ftol": 1e-12, "gtol": tol})
         if np.isfinite(result.fun):
             coords = np.r_[result.x, 20.0] if fixed_r_boundary else np.asarray(result.x, dtype=np.float64)
-            optimizer_success = bool(result.success)
-            backstop = float(np.linalg.norm(jac(coords), ord=np.inf)) < 1e-4
-            converged = optimizer_success or backstop
-            # The back-stop is two orders of magnitude looser than the loop's
-            # own criterion, so it is named separately rather than reported as
-            # an ordinary convergence.
-            status = ("dense_finish" if optimizer_success
-                      else "dense_finish_backstop" if backstop
-                      else "dense_finish_failed")
             last_q = _quantities(ops, y_arr, coords, probes, exact=True, cg_tol=cg_tol)
             accepted_iterations += int(result.nit)
+            # Judged by the same criterion as the loop, not by SciPy's verdict
+            # and not by a looser absolute score bound.  An earlier revision
+            # declared convergence here at ``||score||_inf < 1e-4``, two orders
+            # of magnitude looser than the loop's own rule and sample-size
+            # dependent besides.
+            finish_active = (np.array([0, 1], dtype=np.int64) if fixed_r_boundary
+                             else np.arange(last_q.score.size))
+            finish_step_se, _finish_decrement = convergence_statistics(
+                last_q.score[finish_active],
+                ((last_q.ai + last_q.ai.T) * 0.5)[np.ix_(finish_active, finish_active)],
+            )
+            converged = finish_step_se <= step_se_tol
+            status = "converged_after_dense_finish" if converged else "optimizer_stalled"
 
     # The shape object used internally is unit-scale; report the profiled
     # scientific scale on the public prior object.
@@ -699,22 +734,41 @@ def fit_reml(
             warnings.add("rho^2 is at the simplified-model boundary")
     score_norm = float(np.linalg.norm(last_q.score, ord=np.inf))
     reported_active = np.array([0, 1], dtype=np.int64) if fixed_r_boundary else np.arange(last_q.score.size)
+    reported_ai = ((last_q.ai + last_q.ai.T) * 0.5)[np.ix_(reported_active, reported_active)]
     final_step_se, final_decrement = convergence_statistics(
-        last_q.score[reported_active],
-        ((last_q.ai + last_q.ai.T) * 0.5)[np.ix_(reported_active, reported_active)],
+        last_q.score[reported_active], reported_ai
     )
+    # A coordinate the data do not place anywhere is named, not folded into a
+    # pass or a failure.  When nothing is identified the criterion cannot be
+    # evaluated at all, so the loop's verdict is superseded: there was never
+    # anything to converge.
+    unidentified_mask = unidentified_coordinates(reported_ai)
+    if unidentified_mask.size and np.all(unidentified_mask):
+        status = "unidentified"
+    elif status in CONVERGED_STATUSES and np.any(unidentified_mask):
+        status = "unidentified"
+    if status == "unidentified":
+        warnings.add(
+            "at least one shape coordinate is unidentified; its value is not an estimate"
+        )
     if use_exact:
         objective_value = float(last_q.objective)
     else:
         objective_value = float("nan")
     diagnostics = FitDiagnostics(
-        converged=converged,
-        iterations=max(accepted_iterations, 1),
+        convergence=ConvergenceReport(
+            status=status,
+            converged=status in CONVERGED_STATUSES,
+            iterations=max(accepted_iterations, 1),
+            step_se_norm=float(final_step_se),
+            step_se_tol=float(step_se_tol),
+            newton_decrement=float(final_decrement),
+            score_norm=score_norm,
+            accepted_step=float(last_step),
+            ai_condition=float(ai_condition),
+            ai_damping=float(damping),
+        ),
         objective=objective_value,
-        score_norm=score_norm,
-        ai_condition=float(ai_condition),
-        ai_damping=float(damping),
-        accepted_step=float(last_step),
         trace_estimator="exact" if use_exact else trace_method,
         trace_probes=0 if use_exact else probe_count,
         initialization=initialization,
@@ -730,9 +784,6 @@ def fit_reml(
         random_seed=int(seed),
         boundary_hits=tuple(sorted(warnings)),
         warnings=tuple(sorted(warnings)),
-        status=status,
-        step_se_norm=float(final_step_se),
-        newton_decrement=float(final_decrement),
     )
     return FitResult(
         prior=prior,

@@ -105,6 +105,9 @@ Evidence:
 - [x] Accepted/trial warm-start caches, residual revalidation, rejection of poor
   guesses, and diagnostics.
 - [x] Boundary and weak-identification warnings.
+- [x] One shared `ConvergenceReport` for both fitters, carrying the criterion,
+  its tolerance and the exit status, with `objective` restricted to an actual
+  profiled REML objective or `nan`.
 - [x] Haseman-Elston moment initializer implemented as a public helper.
 
 Evidence:
@@ -114,7 +117,6 @@ Evidence:
 - `src/evo_lmm/results.py`
 - `tests/test_reml_dense.py`
 - `tests/test_trace.py`
-- `tests/test_parameter_estimation_large.py`
 
 ### Annotation-partitioned kernel (MC0 complete)
 
@@ -173,7 +175,9 @@ Evidence:
 
 - `src/evo_lmm/baselines.py`
 - `src/evo_lmm/reporting.py`
-- `tests/test_phase1_components.py`
+- `tests/test_baselines.py`
+- `tests/test_multicomponent.py`
+- `tests/test_reporting.py`
 
 ### Public fitting and prediction surface
 
@@ -204,9 +208,7 @@ Evidence:
   replicate: SLiM with three mutation types -> per-category GRGs -> one
   annotation-partitioned fit at the production defaults, recording runtime,
   `status`, and every `sigma_b2_c`/`tau_c` against its generating value
-  (`benchmarks/multicomponent/`, with `tests/test_multicomponent_benchmark.py`
-  covering the aggregation/plotting stage; results are regenerable and stay
-  untracked).
+  (`benchmarks/multicomponent/`; results are regenerable and stay untracked).
 
 Current benchmark context is documented in
 `docs/tutorials/bolt_benchmark.rst`. The latest regenerated figure reports
@@ -269,7 +271,7 @@ multi-component model". Simplified prior only; the full model is frozen.
   frequency recomputation; measured GRG compression on exome rare variants.
   Needed only for the access-gated Phase 3, so it is the lowest priority here.
 
-Order: MC0 and MC1 are done; MC2 next, then MC3. MC4 is independent and
+Order: MC0, MC1 and MC2 are done; MC3 next. MC4 is independent and
 deferred.
 
 Acceptance gate. All four clauses, no qualifiers:
@@ -491,14 +493,40 @@ immediately after them.
   carries and returns negative variances, which read as zero standard errors
   and hence as convergence. A fit whose `tau` ran away to `2.4e8` was declared
   converged that way during this work.
-- **`status` replaces the single boolean.** `converged`,
-  `stalled_near_tolerance`, `line_search_stalled`, `iteration_cap`,
-  `not_started`, and — on paths that defer to SciPy — `optimizer_success` /
-  `optimizer_failure`, plus `dense_finish`, `dense_finish_backstop`, and
-  `dense_finish_failed` for the single-component exact finishing step. The
-  back-stop is named separately because it declares convergence at
-  `||score||_inf < 1e-4`, two orders of magnitude looser than the loop's own
-  criterion.
+- **One criterion, one report, in both fitters.** `ConvergenceReport` carries
+  `status`, `converged`, `iterations`, `step_se_norm`, `step_se_tol`,
+  `newton_decrement`, `score_norm`, `accepted_step`, `ai_condition` and
+  `ai_damping`; both `fit_reml` and `fit_multicomponent_reml` report through it,
+  and the flat accessors on `FitDiagnostics` and `MultiComponentFit` delegate to
+  it rather than duplicating state. The single-category delegation hands the
+  single fitter's report through unchanged — one category is the same model
+  judged by the same rule, so it is the same object.
+  Status vocabulary: `converged`, `converged_after_dense_finish`,
+  `stalled_near_tolerance`, `unidentified`, `line_search_stalled`,
+  `iteration_cap`, `optimizer_stalled`, `not_started`, `oracle`; `converged` is
+  the summary over the first four. No path reports a delegated optimizer's own
+  verdict any more: the single-component exact finishing step and the
+  multi-component dense method are both judged by `step_se_tol`, and the
+  finishing step's old `||score||_inf < 1e-4` back-stop — two orders of
+  magnitude looser than the loop's own rule, and sample-size dependent — is
+  gone.
+- **`objective` is a REML objective or `nan`, never a surrogate.** The
+  stochastic AI paths evaluate no log-determinant, so they report `nan` and the
+  criterion carries the convergence information. An earlier revision put
+  `0.5*||score||^2` in that slot, which was neither a likelihood nor the
+  criterion convergence was declared on. On the exact dense multi-component
+  method the reported `objective` is tested to equal `profiled_reml_objective`
+  at the returned point, so the field means one thing everywhere.
+- **A coordinate the data do not place anywhere is named, not scored.** A
+  standard error wider than the `+/-30` log-coordinate box the optimizers clip
+  to means the coordinate is unidentified; those coordinates are excluded from
+  the criterion and reported as `status="unidentified"` with a warning naming
+  them. Not leniency: on the seeded pure-null association panels these standard
+  errors run to `7e5`-`1.5e10` log units, so score-over-information there is
+  numerical noise over numerical noise — the old rule declared convergence off
+  a score of `9e-7` where the criterion reads `0.70`. Mid-iteration the case
+  returns `inf` instead, so no loop can stop because its information matrix was
+  briefly unusable.
 - **`tau_c` boundary reporting, report only.** The multi-component fit reports
   each `tau_c` in a regime where it is unidentified, judged on the weights
   `w_j = 1/(1 + 2 tau_c q_j)`: `max_j (1 - w_j) <= 1e-6` (kernel
@@ -546,7 +574,10 @@ generic initial point. Results on this machine:
 
 - **Convergence: 10/10 replicates return `status="converged"`.** This is the
   evidence the deleted acceptance gate asked for, and it is now the reason the
-  question is closed rather than open.
+  question is closed rather than open. The recorded CSV predates the
+  standardized convergence reporting; replicate 0 re-fitted afterwards
+  reproduces the same estimates and the same status, with the `tau_c` boundary
+  warning firing as expected.
 - **The scales — the primary estimands — are recovered.** Mean and sample SD
   over the ten replicates, against the generating value:
 
@@ -671,19 +702,13 @@ Run from the repository root:
 
 ```bash
 uv run pytest -q
-uv run pytest -q -m large
 uv run python -c "import evo_lmm, pygrgl"
 uv run sphinx-build -W -b html docs docs/_build/html
 ```
 
-At the last audit `uv run pytest -q` collected 70 tests and all 70 passed on
-darwin/arm64, including the `large` markers.
-`tests/test_multicomponent_benchmark.py` covers the multi-component benchmark's
-aggregation and plotting stage on synthetic rows; the forward simulations and
-the fits themselves are run through the Snakefile, not the test suite.
-`test_large_grg_matrix_free_fit_matches_dense_parameter_oracle` was once
-reported to fail on aarch64 Linux with a stochastic-tolerance mismatch; it
-passes here, so that report is unconfirmed on this machine. The
+The unit suite deliberately excludes benchmark aggregation/plotting checks and
+large parameter-recovery simulations. Those are exercised by the persisted
+benchmark workflows rather than duplicated under `tests/`. The
 `sphinx-build` command cannot run in this environment: `docs/conf.py` loads the
 `sphinx_design` extension, which is not in the `dev` dependency group — a
 pre-existing dependency gap, not a docs error. Generated simulation artifacts
@@ -700,7 +725,8 @@ calibrated, end-to-end CPU analysis path in which:
    size is not demonstrated and, by decision, is not required here;
 2. LOCO association uses the fitted evolutionary covariance and independent
    BOLT-normalized test columns (done);
-3. null calibration and dense/GRG equivalence tests pass (done);
+3. calibration formulas and dense/GRG equivalence tests pass (done); empirical
+   calibration and recovery live in the benchmark workflows;
 4. BLUP and association preserve the `rho^2 = 1` nested identity (done); and
 5. the multi-replicate benchmark reports accuracy and runtime without rerunning
    forward simulations (done for the multi-component path:

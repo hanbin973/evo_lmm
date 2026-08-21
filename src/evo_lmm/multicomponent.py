@@ -17,7 +17,12 @@ from scipy.sparse.linalg import LinearOperator, cg
 
 from .operators import EvolutionaryLmmOps
 from .priors import SimplifiedPrior
-from .reml import _dense_projection, convergence_statistics
+from .reml import (
+    _dense_projection,
+    convergence_statistics,
+    unidentified_coordinates,
+)
+from .results import CONVERGED_STATUSES, ConvergenceReport
 from .trace import rademacher_probes, spherical_gaussian_probes
 
 
@@ -293,40 +298,79 @@ class MultiComponentOps:
 class MultiComponentFit:
     """Profiled REML result for the partitioned simplified model.
 
-    ``status`` names how the fit ended -- ``converged``,
-    ``stalled_near_tolerance``, ``line_search_stalled``, ``iteration_cap``,
-    ``not_started``, or ``optimizer_success``/``optimizer_failure`` on the exact
-    dense method, where the label is SciPy's verdict and not this module's
-    criterion.  ``step_se_norm`` is the criterion itself,
-    ``max_i |step_i| / SE_i``; see :func:`evo_lmm.reml.convergence_statistics`.
+    Convergence is reported through :class:`evo_lmm.ConvergenceReport`, the same
+    object the single-component fitter uses, so the two fitters are judged by
+    one criterion and read the same way.  The flat accessors below delegate to
+    it.
 
-    ``warnings`` reports each ``tau_c`` at or near the zero boundary.  It is a
-    report only: a boundary hit does not change ``status`` or ``converged``.
+    ``objective`` is the profiled REML objective **or ``nan``**.  The AI path
+    never evaluates a log-determinant, so it reports ``nan`` rather than a
+    surrogate; an earlier revision put ``0.5*||score||^2`` in this slot, which
+    was neither a likelihood nor the convergence criterion.  Only the exact
+    dense method returns a real objective here.
+
+    ``warnings`` reports each ``tau_c`` in a regime where it is unidentified.
+    It is a report only: a boundary hit does not change ``status`` or
+    ``converged``.
     """
 
     prior: MultiComponentPrior
     sigma_e2: float
     h2: float
-    objective: float
-    converged: bool
+    convergence: ConvergenceReport
     ops: MultiComponentOps
+    objective: float = float("nan")
     ai_covariance: np.ndarray | None = None
     standard_errors: dict[str, float] | None = None
     trace_method: str = "hutchinson"
     trace_probes: int = 0
     cg_tol: float = float("nan")
-    score_norm: float = float("nan")
     trace_standard_error: float = float("nan")
     phenotype: np.ndarray | None = None
-    accepted_step: float = float("nan")
-    ai_damping: float = float("nan")
-    status: str = "unknown"
-    step_se_norm: float = float("nan")
-    newton_decrement: float = float("nan")
     warnings: tuple[str, ...] = ()
     initialization: str = "default"
     mom_raw_component_scales: np.ndarray | None = None
     mom_truncated: np.ndarray | None = None
+
+    @property
+    def status(self) -> str:
+        return self.convergence.status
+
+    @property
+    def converged(self) -> bool:
+        return self.convergence.converged
+
+    @property
+    def iterations(self) -> int:
+        return self.convergence.iterations
+
+    @property
+    def step_se_norm(self) -> float:
+        return self.convergence.step_se_norm
+
+    @property
+    def step_se_tol(self) -> float:
+        return self.convergence.step_se_tol
+
+    @property
+    def newton_decrement(self) -> float:
+        return self.convergence.newton_decrement
+
+    @property
+    def score_norm(self) -> float:
+        return self.convergence.score_norm
+
+    @property
+    def accepted_step(self) -> float:
+        return self.convergence.accepted_step
+
+    @property
+    def ai_damping(self) -> float:
+        return self.convergence.ai_damping
+
+    @property
+    def ai_condition(self) -> float:
+        return self.convergence.ai_condition
 
 
 def profiled_reml_objective(
@@ -520,17 +564,15 @@ def fit_multicomponent_reml(
             fitted,
             single.sigma_e2,
             single.h2,
-            single.diagnostics.objective,
-            single.diagnostics.converged,
+            # The delegation carries the single fitter's report unchanged: one
+            # category is the same model judged by the same criterion.
+            single.diagnostics.convergence,
             ops,
+            objective=single.diagnostics.objective,
             trace_method=trace_method,
             trace_probes=trace_probes,
             cg_tol=cg_tol,
-            score_norm=single.diagnostics.score_norm,
             phenotype=values.copy(),
-            status=single.diagnostics.status,
-            step_se_norm=single.diagnostics.step_se_norm,
-            newton_decrement=single.diagnostics.newton_decrement,
             warnings=_tau_warnings(ops, fitted),
             initialization=initialization,
         )
@@ -580,21 +622,59 @@ def fit_multicomponent_reml(
                 standard_errors[f"log_tau[{label}]"] = float(diagonal[2 * index + 1])
         except (AttributeError, ValueError):
             covariance = None
+    # Judged by the shared criterion, not by SciPy's verdict.  This is the
+    # small-dense path, so the exact-trace score and information are affordable:
+    # ``probes = sqrt(n) * I`` makes the Hutchinson estimator exact.
+    ratio = MultiComponentPrior(
+        ops.labels,
+        tuple(
+            SimplifiedPrior(p.sigma_b2 / max(sigma_e2, np.finfo(float).tiny), p.tau)
+            for p in fitted.components
+        ),
+    )
+    state = score_and_information(
+        ops, values, ratio, np.sqrt(float(ops.n)) * np.eye(ops.n), cg_tol=1e-12
+    )
+    dense_step_se, dense_decrement = convergence_statistics(state["score"], state["ai"])
+    dense_status = "converged" if dense_step_se <= step_se_tol else "optimizer_stalled"
+    dense_unidentified = tuple(
+        name
+        for name, flag in zip(
+            coordinate_names(ops.labels), unidentified_coordinates(state["ai"])
+        )
+        if flag
+    )
+    if dense_unidentified and (
+        len(dense_unidentified) == 2 * ops.n_components
+        or dense_status in CONVERGED_STATUSES
+    ):
+        dense_status = "unidentified"
     return MultiComponentFit(
         fitted,
         sigma_e2,
         h2,
-        objective,
-        bool(result.success),
+        ConvergenceReport(
+            status=dense_status,
+            converged=dense_status in CONVERGED_STATUSES,
+            iterations=int(getattr(result, "nit", 0)),
+            step_se_norm=float(dense_step_se),
+            step_se_tol=float(step_se_tol),
+            newton_decrement=float(dense_decrement),
+            score_norm=float(np.linalg.norm(state["score"], ord=np.inf)),
+        ),
         ops,
-        covariance,
-        standard_errors,
-        trace_method,
-        trace_probes,
-        cg_tol,
+        objective=objective,
+        ai_covariance=covariance,
+        standard_errors=standard_errors,
+        trace_method=trace_method,
+        trace_probes=trace_probes,
+        cg_tol=cg_tol,
         phenotype=values.copy(),
-        status="optimizer_success" if result.success else "optimizer_failure",
-        warnings=_tau_warnings(ops, fitted),
+        warnings=_tau_warnings(ops, fitted)
+        + tuple(
+            f"{name} is unidentified; its value is not an estimate"
+            for name in dense_unidentified
+        ),
         initialization=initialization,
         mom_raw_component_scales=mom_raw_component_scales,
         mom_truncated=mom_truncated,
@@ -875,6 +955,9 @@ def _fit_multicomponent_ai(
     last_trace_error = float("nan")
     last_step_se = float("nan")
     last_decrement = float("nan")
+    last_ai_condition = float("nan")
+    last_ai: np.ndarray | None = None
+    iterations_run = 0
     damping = 0.0
 
     def evaluate(current: np.ndarray, *, information: bool = True) -> dict[str, Any]:
@@ -908,8 +991,12 @@ def _fit_multicomponent_ai(
     for iteration in range(1, int(max_iter) + 1):
         state = pending if pending is not None else evaluate(coords)
         pending = None
+        iterations_run = iteration
         score = state["score"][active]
         ai = state["ai"][np.ix_(active, active)]
+        last_ai = ai
+        if np.all(np.isfinite(ai)) and ai.size:
+            last_ai_condition = float(np.linalg.cond(ai))
         last_score = state["score"]
         last_prior = state["prior"]
         last_sigma_e2 = state["sigma_e2"]
@@ -977,6 +1064,23 @@ def _fit_multicomponent_ai(
 
     if not converged and int(max_iter) > 0:
         status = "line_search_stalled" if last_rejected else "iteration_cap"
+    unidentified = (
+        ()
+        if last_ai is None
+        else tuple(
+            names[index]
+            for index, flag in zip(active, unidentified_coordinates(last_ai))
+            if flag
+        )
+    )
+    # Named, not folded into a pass or a failure: the data do not place these
+    # coordinates anywhere inside their own parameterization.  With nothing
+    # identified the criterion cannot be evaluated, so the loop's verdict is
+    # superseded -- there was never anything to converge.
+    if unidentified and (
+        len(unidentified) == active.size or status in CONVERGED_STATUSES
+    ):
+        status = "unidentified"
 
     # Coordinates that were held fixed are restored from ``initial`` rather
     # than reconstructed from log coordinates, so a pooled shape survives the
@@ -1001,31 +1105,39 @@ def _fit_multicomponent_ai(
             for index, name in enumerate(names)
         }
     )
-    # The AI path does not evaluate a stochastic log-determinant objective;
-    # expose a finite score diagnostic in the common ``objective`` slot.
-    objective = float(0.5 * np.dot(last_score[active], last_score[active]))
+    # The AI path never evaluates a log-determinant, so there is no objective
+    # to report: ``objective`` stays ``nan`` and convergence is read from the
+    # criterion in the report below.
     return MultiComponentFit(
         fitted,
         last_sigma_e2,
         h2,
-        objective,
-        converged,
+        ConvergenceReport(
+            status=status,
+            converged=status in CONVERGED_STATUSES,
+            iterations=int(iterations_run),
+            step_se_norm=float(last_step_se),
+            step_se_tol=float(step_se_tol),
+            newton_decrement=float(last_decrement),
+            score_norm=float(np.linalg.norm(last_score[active], ord=np.inf)),
+            accepted_step=float(last_step),
+            ai_damping=float(damping),
+            ai_condition=float(last_ai_condition),
+        ),
         ops,
-        covariance,
-        errors,
-        trace_method,
-        trace_probes,
-        cg_tol,
-        float(np.linalg.norm(last_score[active], ord=np.inf)),
-        last_trace_error,
-        y.copy(),
-        last_step,
-        damping,
-        status,
-        float(last_step_se),
-        float(last_decrement),
-        _tau_warnings(ops, fitted),
-        initialization,
-        mom_raw_component_scales,
-        mom_truncated,
+        ai_covariance=covariance,
+        standard_errors=errors,
+        trace_method=trace_method,
+        trace_probes=trace_probes,
+        cg_tol=cg_tol,
+        trace_standard_error=last_trace_error,
+        phenotype=y.copy(),
+        warnings=_tau_warnings(ops, fitted)
+        + tuple(
+            f"{name} is unidentified; its value is not an estimate"
+            for name in unidentified
+        ),
+        initialization=initialization,
+        mom_raw_component_scales=mom_raw_component_scales,
+        mom_truncated=mom_truncated,
     )

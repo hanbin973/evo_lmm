@@ -38,7 +38,7 @@ from .reml import (
     fit_reml,
     restricted_log_likelihood,
 )
-from .results import AssociationResult, FitDiagnostics, FitResult
+from .results import AssociationResult, ConvergenceReport, FitDiagnostics, FitResult
 from .simulation import GrgSimulation, simulate_grg_lmm
 from .multicomponent import (
     MultiComponentFit,
@@ -77,6 +77,7 @@ from .reporting import (
 __all__ = [
     "AssociationResult",
     "CalibrationResult",
+    "ConvergenceReport",
     "DenseREMLOracle",
     "convergence_statistics",
     "EvolutionaryLmmOps",

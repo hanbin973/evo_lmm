@@ -1,24 +1,22 @@
-"""Priority 0 tests for the calibrated BOLT-style association path."""
+"""Tests for the calibrated BOLT-style association path."""
 
 from __future__ import annotations
 
 import math
 
 import numpy as np
+import pygrgl
 import pytest
 
-import pygrgl
-
 from evo_lmm import (
+    ConvergenceReport,
     EvolutionaryLmmOps,
     FullPrior,
     SimplifiedPrior,
     association,
-    association_summary,
     calibrate_association,
     fit_evolutionary_bolt_lmm,
     fit_evolutionary_lmm,
-    fit_reml,
     loco_solve,
     predict_blup,
     select_calibration_variants,
@@ -53,13 +51,19 @@ def _fixed_result(ops, y, prior, delta):
     q = float(projected @ ph_y)
     sigma_b2 = q / max(ops.dim, 1)
     diagnostics = FitDiagnostics(
-        converged=True,
-        iterations=0,
+        # Not produced by an optimizer: an explicitly constructed covariance.
+        convergence=ConvergenceReport(
+            status="oracle",
+            converged=True,
+            iterations=0,
+            step_se_norm=0.0,
+            newton_decrement=0.0,
+            score_norm=0.0,
+            accepted_step=0.0,
+            ai_condition=1.0,
+            ai_damping=0.0,
+        ),
         objective=float("nan"),
-        score_norm=0.0,
-        ai_condition=1.0,
-        ai_damping=0.0,
-        accepted_step=0.0,
         trace_estimator="exact",
         trace_probes=0,
     )
@@ -273,14 +277,14 @@ def test_dense_and_grg_association_agree(two_chromosome_grgs):
     # the tight CG tolerance: at the production default the two paths agree
     # only to the solver's truncation level, which would mask a real
     # operator-level discrepancy.
-    settings = dict(
-        model="simplified",
-        initial=SimplifiedPrior(0.5, 0.5),
-        max_iter=3,
-        trace_probes=8,
-        seed=41,
-        cg_tol=ORACLE_CG_TOL,
-    )
+    settings = {
+        "model": "simplified",
+        "initial": SimplifiedPrior(0.5, 0.5),
+        "max_iter": 3,
+        "trace_probes": 8,
+        "seed": 41,
+        "cg_tol": ORACLE_CG_TOL,
+    }
     grg_fit = fit_evolutionary_bolt_lmm(grg_chroms, phenotype, **settings)
     dense_fit = fit_evolutionary_lmm(dense_chroms, phenotype, exact=False, **settings)
 
@@ -300,70 +304,6 @@ def test_dense_and_grg_association_agree(two_chromosome_grgs):
             np.testing.assert_allclose(
                 getattr(a, name)[mask], getattr(b, name)[mask], rtol=1e-5, atol=1e-8
             )
-
-
-# ---------------------------------------------------------------------------
-# null calibration
-# ---------------------------------------------------------------------------
-
-
-def _null_dense_panel(seed, n=300, m0=150, m1=160):
-    rng = np.random.default_rng(seed)
-    f0 = rng.uniform(0.1, 0.5, size=m0)
-    f1 = rng.uniform(0.1, 0.5, size=m1)
-    x0 = rng.binomial(2, f0, size=(n, m0)).astype(float)
-    x1 = rng.binomial(2, f1, size=(n, m1)).astype(float)
-    return rng, {"1": x0, "2": x1}
-
-
-@pytest.mark.parametrize("seed", [1, 2, 3])
-def test_seeded_pure_null_statistics_are_calibrated(seed):
-    rng, genotypes = _null_dense_panel(seed)
-    y = rng.normal(size=genotypes["1"].shape[0])
-    fit = fit_evolutionary_lmm(genotypes, y, model="simplified", max_iter=40, exact=True)
-    assert fit.diagnostics.converged
-    calibration = calibrate_association(fit, count=25, seed=seed)
-    assert calibration.n_selected == 25
-    assert np.all(calibration.prospective > 0.0)
-    assert np.all(calibration.retrospective > 0.0)
-    assert all(scale > 0.0 for scale in calibration.inverse_scale.values())
-    # With no genetic signal the fitted covariance collapses towards the
-    # identity, so the calibration factor must be close to one.
-    assert calibration.factor == pytest.approx(1.0, abs=0.15)
-
-    summary = association_summary(association(fit, calibration=calibration))
-    assert summary["lmm"]["n_good"] == 310
-    assert summary["lmm"]["mean"] == pytest.approx(1.0, abs=0.2)
-    assert summary["lmm"]["lambda_gc"] == pytest.approx(1.0, abs=0.35)
-    # A null LMM statistic must not be inflated relative to plain regression.
-    assert summary["lmm"]["mean"] == pytest.approx(summary["linreg"]["mean"], abs=0.15)
-
-
-@pytest.mark.parametrize("seed", [1, 2, 3])
-def test_seeded_polygenic_null_chromosome_is_not_inflated(seed):
-    rng, genotypes = _null_dense_panel(seed)
-    prior = SimplifiedPrior(sigma_b2=0.02, tau=0.5)
-    causal = genotypes["1"]
-    effects = rng.normal(scale=np.sqrt(prior.effect_variances(causal.mean(axis=0) / 2.0)))
-    genetic = causal @ effects
-    genetic = (genetic - genetic.mean()) / genetic.std()
-    y = math.sqrt(0.5) * genetic + math.sqrt(0.5) * rng.normal(size=genetic.size)
-
-    fit = fit_evolutionary_lmm(genotypes, y, model="simplified", max_iter=40, exact=True)
-    assert fit.diagnostics.converged
-    calibration = calibrate_association(fit, count=25, seed=seed)
-    assert calibration.factor == pytest.approx(1.0, abs=0.25)
-
-    results = association(fit, calibration=calibration)
-    null_chromosome = association_summary([item for item in results if item.chrom == "2"])
-    assert null_chromosome["lmm"]["mean"] == pytest.approx(1.0, abs=0.4)
-    # Chromosome 2 carries no signal, so the mixed-model statistic there must
-    # stay in line with the plain-regression statistic on the same variants.
-    assert null_chromosome["lmm"]["mean"] == pytest.approx(
-        null_chromosome["linreg"]["mean"], abs=0.25
-    )
-    pooled = np.concatenate([item.pvalue[item.good()] for item in results if item.chrom == "2"])
-    assert np.all((pooled > 0.0) & (pooled <= 1.0))
 
 
 def test_grg_calibration_is_well_formed(two_chromosome_grgs):

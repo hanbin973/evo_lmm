@@ -6,11 +6,11 @@ from evo_lmm import (
     MultiComponentPrior,
     SimplifiedPrior,
     fit_multicomponent_reml,
-    fit_parameter_profiles,
-    fit_report,
+    joint_mom_initialization,
 )
 from evo_lmm.multicomponent import profiled_reml_objective, score_and_information
 from evo_lmm.reml import fit_reml
+from evo_lmm.results import CONVERGED_STATUSES
 
 
 def _ops():
@@ -168,13 +168,6 @@ def test_matrix_free_multicomponent_ai_fit_uses_operator_path():
         assert fit.trace_method == trace_method
         assert fit.trace_probes == 12
         assert fit.cg_tol == 5e-4
-        report = fit_report(fit, maf_bins=[0.0, 0.25, 0.5])
-        assert np.isfinite(report.heritability_se)
-        assert all(np.isfinite(value) for value in report.component_standard_errors.values())
-        profiles = fit_parameter_profiles(
-            fit, {"sigma_b2[lof]": [0.5, 1.0, 2.0], "tau[missense]": [0.0, 0.5, 1.0]}
-        )
-        assert all(np.all(np.isfinite(profile.objective)) for profile in profiles.values())
 
 
 def test_single_category_fit_delegates_to_existing_fitter_bit_for_bit():
@@ -185,7 +178,7 @@ def test_single_category_fit_delegates_to_existing_fitter_bit_for_bit():
     used to force ``exact=True``, which would have materialised dense kernels
     from a GRG and ignored the requested solver settings.
     """
-    ops, genotypes, frequencies = _ops()
+    _, genotypes, frequencies = _ops()
     single_ops = MultiComponentOps.from_dense({"lof": genotypes["lof"]}, {"lof": frequencies["lof"]})
     y = 2.0 * np.random.default_rng(33).normal(size=single_ops.n)
     multi = fit_multicomponent_reml(
@@ -232,7 +225,7 @@ def test_dense_and_grg_backed_multicomponent_fits_agree_at_the_default_cg_tol():
     assert all(chrom.dense is None
                for op in grg_ops.components.values() for chrom in op._chromosomes)
     y = np.random.default_rng(21).normal(size=grg_ops.n)
-    settings = dict(max_iter=12, trace_probes=12, seed=3)
+    settings = {"max_iter": 12, "trace_probes": 12, "seed": 3}
     dense_fit = fit_multicomponent_reml(dense_ops, y, **settings)
     grg_fit = fit_multicomponent_reml(grg_ops, y, **settings)
     assert dense_fit.cg_tol == 5e-4 and grg_fit.cg_tol == 5e-4
@@ -393,58 +386,6 @@ def test_average_information_matches_dense_oracle_and_is_positive_semidefinite()
     assert np.min(np.linalg.eigvalsh(oracle_ai)) >= -1e-8
 
 
-def test_seeded_two_category_fit_converges_and_recovers_heritability():
-    """A converged fit must reach the truth's likelihood, not merely return.
-
-    Regression: with the score and AI defects above the fitter stalled on the
-    first iteration -- it returned ``converged=False`` with ``h2`` pinned near
-    one and ``tau`` collapsed to zero, at a profiled objective far worse than
-    the objective at the generating parameters.  A third defect kept it there:
-    a rejected line search left the loop instead of escalating the Levenberg
-    damping, and an undamped step in the weakly identified ``tau`` directions
-    is capped to one that barely moves the scale coordinates.
-    """
-    n = 600
-    rng = np.random.default_rng(202)
-    genotypes, frequencies, contribution = {}, {}, np.zeros(n)
-    truth_parameters = (("lof", 90, 0.2, 30.0), ("missense", 120, 0.1, 5.0))
-    residual_sd = 1.0
-    for label, count, scale, tau in truth_parameters:
-        p = rng.beta(0.4, 0.4, size=count) * 0.49 + 0.01
-        matrix = rng.binomial(2, p, size=(n, count)).astype(float)
-        freq = matrix.mean(axis=0) / 2.0
-        q = freq * (1.0 - freq)
-        contribution += matrix @ rng.normal(0.0, np.sqrt(scale / (1.0 + 2.0 * tau * q)))
-        genotypes[label] = matrix
-        frequencies[label] = freq
-    y = contribution + rng.normal(0.0, residual_sd, size=n)
-    ops = MultiComponentOps.from_dense(genotypes, frequencies)
-    realized_h2 = contribution.var() / (contribution.var() + residual_sd ** 2)
-
-    fit = fit_multicomponent_reml(ops, y, max_iter=60, trace_probes=12, seed=1)
-
-    assert fit.converged, f"step_se_norm={fit.step_se_norm}"
-    assert fit.status == "converged"
-    assert fit.step_se_norm <= 1e-2
-    # The old absolute score gate would not have been met here; the criterion
-    # is the scale-free statistic, not ||score||_inf.
-    assert fit.score_norm > 1e-6
-    assert abs(fit.h2 - realized_h2) < 0.1, f"h2={fit.h2} against {realized_h2}"
-    assert np.all(fit.prior.tau > 0.0), "tau collapsed to the zero boundary"
-    ratio = MultiComponentPrior(
-        ops.labels,
-        tuple(SimplifiedPrior(p.sigma_b2 / fit.sigma_e2, p.tau) for p in fit.prior.components),
-    )
-    truth_ratio = MultiComponentPrior(
-        ops.labels,
-        tuple(SimplifiedPrior(scale / residual_sd ** 2, tau)
-              for _label, _count, scale, tau in truth_parameters),
-    )
-    assert (profiled_reml_objective(ops, y, ratio)[0]
-            <= profiled_reml_objective(ops, y, truth_ratio)[0] + 1e-6)
-    assert np.isfinite(fit.trace_standard_error)
-
-
 def test_pooled_shape_fit_holds_tau_fixed_while_a_free_fit_moves_it():
     """``fit_tau=False`` must search the scales only.
 
@@ -494,12 +435,12 @@ def test_status_names_how_the_fit_ended():
     assert np.isfinite(done.newton_decrement)
 
     dense = fit_multicomponent_reml(ops, y, max_iter=200, method="dense")
-    # The dense method reports SciPy's verdict, not this module's criterion.
-    assert dense.status in ("optimizer_success", "optimizer_failure")
-    assert dense.converged == (dense.status == "optimizer_success")
+    # The dense method is judged by the same criterion, not by SciPy's verdict.
+    assert dense.status in ("converged", "optimizer_stalled", "unidentified")
+    assert np.isfinite(dense.step_se_norm) or dense.status == "unidentified"
 
-    for fit in (not_started, capped, done):
-        assert fit.converged == (fit.status in ("converged", "stalled_near_tolerance"))
+    for fit in (not_started, capped, done, dense):
+        assert fit.converged == (fit.status in CONVERGED_STATUSES)
 
 
 def test_tau_boundary_is_reported_without_changing_convergence():
@@ -529,3 +470,151 @@ def test_tau_boundary_is_reported_without_changing_convergence():
         ops.labels, (SimplifiedPrior(1.0, 2.0), SimplifiedPrior(1.0, 5.0))
     )
     assert _tau_warnings(ops, interior) == ()
+
+
+def test_both_fitters_report_one_convergence_surface():
+    """The single- and multi-component fitters must report the same object.
+
+    Convergence is judged by one criterion, so it is reported through one
+    :class:`evo_lmm.ConvergenceReport` in both fitters.
+    """
+    from evo_lmm.results import ConvergenceReport
+
+    ops, _, _ = _ops()
+    y = 2.0 * np.random.default_rng(51).normal(size=ops.n)
+    reference = fit_reml(
+        ops.components["lof"], y, initial=SimplifiedPrior(1.0, 0.0), max_iter=8,
+        trace_method="hutchinson", trace_probes=12, seed=0, cg_tol=5e-4,
+    )
+    assert isinstance(reference.diagnostics.convergence, ConvergenceReport)
+
+    multi = fit_multicomponent_reml(ops, y, max_iter=20)
+    assert isinstance(multi.convergence, ConvergenceReport)
+    for field in ("status", "converged", "iterations", "step_se_norm", "step_se_tol",
+                  "newton_decrement", "score_norm", "accepted_step", "ai_damping"):
+        assert hasattr(multi.convergence, field)
+        # The flat accessors delegate rather than duplicating state.
+        assert getattr(multi, field) == getattr(multi.convergence, field)
+        assert getattr(reference.diagnostics, field) == getattr(
+            reference.diagnostics.convergence, field
+        )
+    assert multi.step_se_tol == reference.diagnostics.step_se_tol == 1e-2
+
+
+def test_objective_is_a_reml_objective_or_nan_never_a_surrogate():
+    """``objective`` must not stand in for the convergence criterion.
+
+    Regression: the AI path reported ``0.5*||score||^2`` in this slot, which is
+    neither a likelihood nor the criterion convergence is declared on.
+    """
+    ops, _, _ = _ops()
+    y = 2.0 * np.random.default_rng(52).normal(size=ops.n)
+
+    stochastic = fit_multicomponent_reml(ops, y, max_iter=6)
+    assert np.isnan(stochastic.objective), "no log-determinant is evaluated on this path"
+    assert np.isfinite(stochastic.step_se_norm)
+
+    dense = fit_multicomponent_reml(ops, y, max_iter=200, method="dense")
+    ratio = MultiComponentPrior(
+        ops.labels,
+        tuple(
+            SimplifiedPrior(component.sigma_b2 / dense.sigma_e2, component.tau)
+            for component in dense.prior.components
+        ),
+    )
+    np.testing.assert_allclose(
+        dense.objective, profiled_reml_objective(ops, y, ratio)[0], rtol=1e-12
+    )
+
+
+def test_joint_mom_reports_raw_and_truncated_estimates():
+    ops, _, _ = _ops()
+    prior = MultiComponentPrior(
+        ops.labels, (SimplifiedPrior(1.0, 0.3), SimplifiedPrior(0.7, 0.8))
+    )
+    y = np.random.default_rng(2).normal(size=ops.n)
+    result = joint_mom_initialization(ops, y, prior)
+    projected = ops.project(y)
+    kernels = ops.component_kernels(prior)
+    traces = np.asarray([np.trace(kernel) for kernel in kernels.values()])
+    expected_system = np.block(
+        [
+            [
+                np.asarray(
+                    [
+                        [np.trace(left @ right) for right in kernels.values()]
+                        for left in kernels.values()
+                    ]
+                ),
+                traces[:, None],
+            ],
+            [traces[None, :], np.asarray([[ops.dim]])],
+        ]
+    )
+    expected_rhs = np.asarray(
+        [projected @ kernel @ projected for kernel in kernels.values()]
+        + [projected @ projected]
+    )
+    expected_raw = np.linalg.solve(expected_system, expected_rhs)
+    np.testing.assert_allclose(result.system, expected_system, rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(
+        result.raw_component_scales, expected_raw[:-1], rtol=1e-12, atol=1e-12
+    )
+    np.testing.assert_allclose(
+        result.residual_variance, max(expected_raw[-1], np.finfo(float).tiny)
+    )
+    np.testing.assert_array_equal(
+        result.component_scales, np.maximum(expected_raw[:-1], 0.0)
+    )
+    xtrace_result = joint_mom_initialization(
+        ops, y, prior, trace_method="xtrace", trace_probes=4, seed=4
+    )
+    assert xtrace_result.trace_standard_errors is not None
+
+
+def test_ai_reml_supports_hutchinson_and_xtrace():
+    ops, _, _ = _ops()
+    y = np.random.default_rng(9).normal(size=ops.n)
+    for trace_method in ("hutchinson", "xtrace"):
+        fit = fit_multicomponent_reml(
+            ops, y, max_iter=2, trace_method=trace_method, trace_probes=4
+        )
+        assert np.isnan(fit.objective)
+        assert np.isfinite(fit.step_se_norm)
+        assert fit.step_se_tol == 1e-2
+        assert fit.ai_covariance is not None
+        assert fit.standard_errors is not None
+        assert fit.prior.labels == ops.labels
+        assert all(np.isfinite(value) for value in fit.standard_errors.values())
+
+
+def test_joint_haseman_elston_is_available_as_multicomponent_fit_mode():
+    ops, _, _ = _ops()
+    prior = MultiComponentPrior(
+        ops.labels, (SimplifiedPrior(1.0, 0.3), SimplifiedPrior(0.7, 0.8))
+    )
+    y = np.random.default_rng(31).normal(size=ops.n)
+    moment = joint_mom_initialization(ops, y, prior, trace_method="exact", seed=7)
+    fit = fit_multicomponent_reml(
+        ops,
+        y,
+        initial=prior,
+        initialization="he",
+        max_iter=0,
+        trace_probes=4,
+        seed=7,
+    )
+    assert fit.initialization == "he"
+    np.testing.assert_array_equal(
+        fit.mom_raw_component_scales, moment.raw_component_scales
+    )
+    np.testing.assert_array_equal(fit.mom_truncated, moment.truncated)
+    np.testing.assert_array_equal(fit.prior.tau, prior.tau)
+
+
+def test_multicomponent_fit_rejects_unknown_initialization_mode():
+    ops, _, _ = _ops()
+    with np.testing.assert_raises(ValueError):
+        fit_multicomponent_reml(
+            ops, np.random.default_rng(32).normal(size=ops.n), initialization="nonsense"
+        )

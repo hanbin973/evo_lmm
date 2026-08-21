@@ -10,15 +10,36 @@ import numpy as np
 from .priors import EvolutionaryPrior
 
 
-@dataclass
-class FitDiagnostics:
-    """Numerical and identifiability diagnostics from a fit.
+@dataclass(frozen=True)
+class ConvergenceReport:
+    """How a fit ended, in sample-size-independent terms.
 
-    ``converged`` is a summary; ``status`` names *how* the fit ended and is the
-    field to branch on:
+    Both fitters -- single-component :func:`evo_lmm.fit_reml` and
+    :func:`evo_lmm.fit_multicomponent_reml` -- judge convergence by the same
+    rule and report it through this object, so the two are comparable.
+
+    ``step_se_norm`` **is** the criterion:
+    ``max_i |step_i| / SE_i`` with ``step = AI^-1 score`` and
+    ``SE = sqrt(diag(AI^-1))`` -- the largest move the next undamped Newton
+    step would make in any coordinate, in units of that coordinate's own
+    standard error.  Convergence is declared when it is at or below
+    ``step_se_tol``.  ``newton_decrement`` is ``sqrt(score' AI^-1 score)``,
+    logged alongside it.  Both are dimensionless, invariant to a
+    reparameterization of the coordinates, and order one at a fixed distance
+    from the optimum regardless of sample size.
+
+    ``score_norm`` is a **diagnostic, not a criterion**: at a fixed statistical
+    distance from the optimum it grows roughly like ``sqrt(n)``, so no absolute
+    bound on it means the same thing at two sample sizes.  It is reported
+    because it is cheap and occasionally informative, never to be thresholded.
+
+    ``status`` names the exit, and is the field to branch on:
 
     ``converged``
-        The step/standard-error criterion was met at an accepted iterate.
+        ``step_se_norm <= step_se_tol`` at an accepted iterate.
+    ``converged_after_dense_finish``
+        The criterion was met only after the exact dense finishing optimizer
+        ran (single-component fitter).
     ``stalled_near_tolerance``
         Every step halving was rejected, but the criterion was within ten times
         its tolerance, so the iterate is accepted as converged.
@@ -27,36 +48,66 @@ class FitDiagnostics:
         rejected.
     ``iteration_cap``
         The iteration budget ran out with steps still being accepted.
+    ``optimizer_stalled``
+        A delegated optimizer (dense L-BFGS-B) returned without meeting the
+        criterion, whatever its own verdict was.
+    ``unidentified``
+        The criterion is met on every direction the information matrix locates,
+        but at least one coordinate has a standard error wider than its own
+        coordinate box, so the data do not place it anywhere.  The fit is done;
+        that coordinate's value is not an estimate and must not be reported.
+        A pure-null panel lands here: with no genetic variance there is no
+        information about the frequency-shape parameter.
     ``not_started``
         ``max_iter=0``; the reported state is the initial point.
-    ``dense_finish``
-        The exact dense finishing optimizer reported success.
-    ``dense_finish_backstop``
-        The finishing optimizer did not report success and convergence was
-        declared only by the loose ``||score||_inf < 1e-4`` back-stop.
-    ``dense_finish_failed``
-        The finishing optimizer ran and convergence was not declared.
+    ``oracle``
+        Not produced by an optimizer at all -- an explicitly constructed
+        covariance, used by oracle tests.
 
-    ``step_se_norm`` is the convergence statistic itself:
-    ``max_i |step_i| / SE_i`` with ``step = AI^-1 score`` and
-    ``SE = sqrt(diag(AI^-1))`` -- the largest move the next undamped Newton
-    step would make in any coordinate, in units of that coordinate's own
-    standard error.  ``newton_decrement`` is ``sqrt(score' AI^-1 score)``,
-    logged for comparison.  Both are dimensionless, invariant to a
-    reparameterization of the coordinates, and order one at a fixed distance
-    from the optimum in standard-error units -- unlike ``score_norm``, which at
-    the same point grows roughly like ``sqrt(n)``.
+    ``converged`` is the summary ``status in``
+    :data:`CONVERGED_STATUSES`; it never distinguishes these cases on its own,
+    which is why ``status`` exists.
     """
 
-    converged: bool
-    iterations: int
-    objective: float
-    score_norm: float
-    ai_condition: float
-    ai_damping: float
-    accepted_step: float
+    status: str = "unknown"
+    converged: bool = False
+    iterations: int = 0
+    step_se_norm: float = float("nan")
+    step_se_tol: float = float("nan")
+    newton_decrement: float = float("nan")
+    score_norm: float = float("nan")
+    accepted_step: float = float("nan")
+    ai_condition: float = float("nan")
+    ai_damping: float = float("nan")
+
+
+CONVERGED_STATUSES = frozenset(
+    {
+        "converged",
+        "converged_after_dense_finish",
+        "stalled_near_tolerance",
+        "unidentified",
+    }
+)
+
+
+@dataclass
+class FitDiagnostics:
+    """Numerical and identifiability diagnostics from a fit.
+
+    Convergence lives in :class:`ConvergenceReport` under ``convergence``; the
+    flat accessors below delegate to it so both fitters expose the same names.
+
+    ``objective`` is the profiled REML objective **or ``nan``**.  It is never a
+    stand-in for something else: the stochastic paths do not evaluate a
+    log-determinant, so they report ``nan`` rather than a surrogate, and
+    convergence is judged by ``convergence.step_se_norm`` in every path.
+    """
+
+    convergence: ConvergenceReport
     trace_estimator: str
     trace_probes: int
+    objective: float = float("nan")
     initialization: str = "default"
     trace_operator_queries: int = 0
     trace_standard_errors: dict[str, float] = field(default_factory=dict)
@@ -68,9 +119,46 @@ class FitDiagnostics:
     random_seed: int | None = None
     boundary_hits: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
-    status: str = "unknown"
-    step_se_norm: float = float("nan")
-    newton_decrement: float = float("nan")
+
+    @property
+    def status(self) -> str:
+        return self.convergence.status
+
+    @property
+    def converged(self) -> bool:
+        return self.convergence.converged
+
+    @property
+    def iterations(self) -> int:
+        return self.convergence.iterations
+
+    @property
+    def step_se_norm(self) -> float:
+        return self.convergence.step_se_norm
+
+    @property
+    def step_se_tol(self) -> float:
+        return self.convergence.step_se_tol
+
+    @property
+    def newton_decrement(self) -> float:
+        return self.convergence.newton_decrement
+
+    @property
+    def score_norm(self) -> float:
+        return self.convergence.score_norm
+
+    @property
+    def accepted_step(self) -> float:
+        return self.convergence.accepted_step
+
+    @property
+    def ai_condition(self) -> float:
+        return self.convergence.ai_condition
+
+    @property
+    def ai_damping(self) -> float:
+        return self.convergence.ai_damping
 
 
 @dataclass

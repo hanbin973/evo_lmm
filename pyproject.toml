@@ -39,6 +39,3 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = [
-    "large: seeded parameter-estimation tests using many individuals",
-]

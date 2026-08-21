@@ -1,6 +1,6 @@
 import numpy as np
 
-from evo_lmm import EvolutionaryLmmOps, FullPrior, SimplifiedPrior
+from evo_lmm import EvolutionaryLmmOps, FullPrior
 
 
 def _data():
@@ -14,7 +14,7 @@ def _data():
 
 
 def test_projected_weighted_kernel_is_dense_and_psd():
-    ops, x1, x2, f1, f2 = _data()
+    ops, *_ = _data()
     prior = FullPrior(1.0, 0.8, 0.7)
     rng = np.random.default_rng(5)
     vector = rng.normal(size=ops.n)
@@ -27,7 +27,7 @@ def test_projected_weighted_kernel_is_dense_and_psd():
 
 
 def test_derivative_and_loco_match_dense_removal():
-    ops, x1, x2, f1, f2 = _data()
+    ops, _, x2, _, f2 = _data()
     prior = FullPrior(1.0, 0.8, 0.7)
     vector = np.random.default_rng(6).normal(size=ops.n)
     derivative = ops.apply_dk(vector, prior, "log_tau")
@@ -59,7 +59,6 @@ def test_batched_h_derivative_matches_column_applications():
 
 def test_model_and_test_operator_are_distinct_when_weights_vary():
     ops, *_ = _data()
-    prior = SimplifiedPrior(1.0, 1.2)
     vector = np.random.default_rng(7).normal(size=ops.n)
     model_scores = ops.model_scores(vector)
     test_scores = np.concatenate([ops.test_scores(chrom, vector) for chrom in ops.chroms])

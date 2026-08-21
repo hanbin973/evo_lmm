@@ -1,7 +1,11 @@
 import numpy as np
 
-from evo_lmm import EvolutionaryLmmOps, FullPrior, SimplifiedPrior, exact_reml_score, fit_reml
-from evo_lmm.reml import _profile_objective_dense, _quantities, haseman_elston_initialization
+from evo_lmm import EvolutionaryLmmOps, FullPrior, SimplifiedPrior, fit_reml
+from evo_lmm.reml import (
+    _profile_objective_dense,
+    _quantities,
+    haseman_elston_initialization,
+)
 
 
 def test_dense_reml_score_matches_profiled_objective_derivative():
@@ -96,14 +100,17 @@ def test_convergence_statistics_are_scale_free_and_reject_rank_deficiency():
 
     # The statistic is invariant under a diagonal reparameterization
     # ``theta -> D theta`` (score -> D^-1 s, AI -> D^-1 AI D^-1), which the raw
-    # score is not: a coordinate rescaling changes ||score||_inf at will.
-    scaling = np.array([1e3, 1e-2])
+    # score is not: a coordinate rescaling changes ||score||_inf at will.  The
+    # identifiability screen is deliberately *not* invariant -- it is defined
+    # against the fitters' own log-coordinate box -- so the scaling here stays
+    # well inside it.
+    scaling = np.array([8.0, 0.125])
     rescaled_score = score / scaling
     rescaled_ai = ai / np.outer(scaling, scaling)
     rescaled_step_se, rescaled_decrement = convergence_statistics(rescaled_score, rescaled_ai)
     np.testing.assert_allclose(rescaled_step_se, step_se, rtol=1e-10)
     np.testing.assert_allclose(rescaled_decrement, decrement, rtol=1e-10)
-    assert np.max(np.abs(rescaled_score)) > 10.0 * np.max(np.abs(score))
+    assert np.max(np.abs(rescaled_score)) > 3.0 * np.max(np.abs(score))
 
     # Rank-one information with a numerically negative null eigenvalue, as a
     # symmetrised stochastic AI produces when two coordinates become
@@ -124,13 +131,43 @@ def test_convergence_statistics_are_scale_free_and_reject_rank_deficiency():
     assert singular_step_se > 1e-2, "a rank-deficient AI must not read as converged"
     assert np.isfinite(singular_decrement) and singular_decrement > 0.0
 
-    # No usable direction at all is reported as unjudgeable, not as converged.
+    # No usable direction at all is reported as unjudgeable, not as converged:
+    # an iteration must never stop because its information matrix was briefly
+    # unusable.  The "nothing was identifiable" case is named by the fit's
+    # status once the fit is over, not by a zero here.
     assert convergence_statistics(np.array([1.0, 1.0]), np.zeros((2, 2))) == (
         float("inf"), float("inf")
     )
     assert convergence_statistics(np.array([1.0]), np.array([[np.nan]])) == (
         float("inf"), float("inf")
     )
+
+
+def test_unidentified_coordinates_screen_uses_the_coordinate_box():
+    """A standard error wider than its own log box means "not located".
+
+    On a pure-null panel these standard errors reach `1e10` log units against a
+    parameterization clipped to `+/-30`, so score-over-information there is
+    numerical noise over numerical noise.
+    """
+    from evo_lmm.reml import (
+        COORDINATE_BOUND,
+        convergence_statistics,
+        unidentified_coordinates,
+    )
+
+    tight = np.diag([4.0, 2.0])
+    np.testing.assert_array_equal(unidentified_coordinates(tight), [False, False])
+    # SE = 1/sqrt(diag): 1e-6 gives SE = 1e3, far outside the +/-30 box.
+    loose = np.diag([4.0, 1e-6])
+    np.testing.assert_array_equal(unidentified_coordinates(loose), [False, True])
+    assert 2.0 * COORDINATE_BOUND == 60.0
+    # The excluded coordinate does not enter the statistic.
+    score = np.array([0.4, 1e-9])
+    only_identified, _ = convergence_statistics(score, loose)
+    np.testing.assert_allclose(only_identified, abs(score[0] / 4.0) / np.sqrt(1 / 4.0))
+    # Nothing identified at all is unjudgeable rather than converged.
+    assert convergence_statistics(score, np.diag([1e-6, 1e-6]))[0] == float("inf")
 
 
 def test_score_norm_grows_with_sample_size_while_the_criterion_does_not():
