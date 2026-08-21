@@ -160,6 +160,24 @@ invariants:
   GRM symmetry/PSD, and likelihood behavior for both model families. Test that
   the full model with `rho_ab^2 = 1` agrees exactly with the simplified model.
   Use a small seeded simulation for each end-to-end test.
+- Organize test files by the first-party module or public surface they verify,
+  mirroring `src/evo_lmm/` where practical (for example
+  `tests/test_baselines.py`, `tests/test_multicomponent.py`, and
+  `tests/test_reporting.py`). Do not name test files after implementation
+  phases, priorities, milestones, or work-item identifiers such as `MC0`.
+- Keep each behavior in one owning test module. Do not duplicate an oracle,
+  nesting identity, or regression check merely to provide evidence for a later
+  implementation stage; plans should cite the owning test instead.
+- Keep pytest deterministic and small enough for routine local execution.
+  Exact algebraic identities, boundary behavior, small dense/GRG equivalence,
+  and public-boundary integration checks remain in pytest and must not be
+  weakened or moved out merely because a benchmark exists.
+- Deliberately defer large-scale parameter recovery, repeated empirical
+  calibration, runtime comparisons, and benchmark aggregation/plot rendering
+  to the persisted benchmark workflows. Do not import benchmark scripts into
+  pytest, add benchmark-only tests, or reintroduce a `large` pytest tier that
+  duplicates those workflows. Benchmarks must record their inputs, seeds,
+  convergence status, estimates, and runtime so the evidence remains auditable.
 - Before handing off changes, run the smallest relevant test suite plus
   `uv run python -c "import pygrgl"` when dependency configuration changes.
 

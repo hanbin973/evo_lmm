@@ -1,6 +1,6 @@
 # Rare-variant heritability under stabilizing selection: reanalysis plan
 
-Last audited: 2026-08-20
+Last audited: 2026-08-21
 
 ## Purpose
 
@@ -351,24 +351,20 @@ of truth for *whether it is done*. Note the naming: `MC` items are this
 extension, and are unrelated to the `Priority N` sections of that ledger, which
 cover the existing single-component fitter.
 
-Current state (audited 2026-08-20): the existing fitter still estimates **one**
-global $(\sigma_b^2, \tau, \rho^2)$ with chromosomes summed into a single
-kernel (`operators.py`, `reml.py`, `bolt.py`). An MC0 implementation slice now
-also exists in `multicomponent.py`: it provides one `SimplifiedPrior` per
-annotation category, category-specific kernels and derivatives, batched
-matrix-free application, and a dense profiled-REML prototype. The GRGL-backed
-multi-component component application and a dense profiled-REML prototype are
-implemented for exact small-data fits; a production projected AI-REML path now
-supports CG solves and Hutchinson/XTrace traces. Block-CG reuse is now in place;
-the independent dense/GRGL-backed operator boundary checks, baseline
-reproduction, and scientific-scale reporting checks are closed. The transferred
-score/step rule is implemented, but production-scale convergence acceptance
-remains open.
+Current state (audited 2026-08-21): MC0–MC2 are implemented. The repository has
+category-partitioned dense and GRGL-backed operators, exact dense and projected
+AI-REML fitting, named baselines, joint MoM initialization, and the reporting
+adapters described below. The small deterministic correctness gates are closed.
+MC3 remains open only because the boundary-mixture p-value helper is not yet
+wired to an assembled likelihood-ratio statistic. MC4 remains deferred. The
+persisted `n=2000` benchmark supplies multi-replicate convergence, recovery, and
+runtime evidence; Phase 2 retains its separate gate at the larger sample sizes
+specified in §6.
 
 ### MC0 — Annotation-partitioned multi-component kernel (simplified prior only)
 
-Implementation status: complete for the current small-data/GRGL scope. The current code supports explicit
-category partitions through `MultiComponentOps` and `MultiComponentPrior`;
+Implementation status: complete. The current code supports explicit category
+partitions through `MultiComponentOps` and `MultiComponentPrior`;
 `tau_c = 0` is tested as the exact flat-prior boundary and all component and
 summed kernels are tested for symmetry and positive semidefiniteness. GRGL
 component application, batched derivatives, shared-`tau`/single-category
@@ -392,7 +388,7 @@ K = \sum_c \sigma_{b,c}^2 \, P_C X_c \,
 \mathrm{diag}\!\left(\frac{1}{1 + 2\tau_c q_j}\right) X_c^{\top} P_C .
 $$
 
-Model invariants to add to `AGENTS.md`:
+Binding model invariants, recorded in `AGENTS.md`:
 
 - $\tau_c$ is category-specific; $W_S$ is the shared quantity. Do not implement
   a globally shared $\tau$ as the default model — it is available only as M1,
@@ -424,20 +420,19 @@ Work items:
 ### MC1 — Named baselines
 
 - [x] `flat` prior ($w_j \equiv 1$) as an explicitly named code path (M0).
-- [x] Marginal-per-category ML + MoM-ratio adjustment **with** the negative-MoM
-  truncation rule, reproduced faithfully, so H6 is an ablation and not a
-  strawman.
+- [x] Marginal-per-category restricted fit plus MoM-ratio adjustment **with**
+  the negative-MoM truncation rule. Whether RareEffect's published marginal
+  convention is ML or REML still requires an external reference run; internal
+  tests cannot settle it.
 - [x] Optional MAC-threshold collapsing operator (burden column construction)
   so H4 is a toggle.
 
 ### MC2 — Joint multi-component MoM / Haseman–Elston
 
-`haseman_elston_initialization()` already solves the one-component moment
-system. Generalize to the $|c|$-component system — structurally the same object
-as RareEffect's $T$ matrix — so that initialization is good in the
-multi-component setting and a like-for-like MoM comparison exists. Good
-initialization matters more here than in the single-component case: six shape
-coordinates in a weakly identified regime.
+`joint_mom_initialization()` implements the $|c|$-component system,
+structurally the same object as RareEffect's $T$ matrix. It provides a
+like-for-like MoM comparison and an optional initializer for the
+multi-component fit; it does not identify the nonlinear $\tau_c$ coordinates.
 
 - [x] $(|c|+1) \times (|c|+1)$ moment system with XTrace/Hutchinson trace
   entries and evolutionary weights.
@@ -453,12 +448,14 @@ coordinates in a weakly identified regime.
   $\sum_{j \in \text{bin}} \sigma_{b,c}^2 w_j \lVert P_C X_j \rVert^2$ — the
   primary quantity for H2.
 - [x] Complete standard errors for $h^2$, $\sigma_{b,c}^2$, $\tau_c$ by delta
-  method from the AI matrix; the current fit exposes approximate covariance and
-  h² uncertainty, while full scientific-scale parameter integration remains.
+  method from the AI matrix, including scientific-scale parameter integration.
   **Profile likelihoods for $\sigma_{b,c}^2$ and $\tau_c$** are available because
   a symmetric delta-method interval is not credible in a weakly identified
   coordinate.
-- [x] Boundary-aware LRT for the ladder (mixture null; not a naive $\chi^2$).
+- [ ] Assemble the ladder LRT from two exact dense fits and apply the available
+  boundary-mixture null. The p-value helper exists; the statistic assembly does
+  not. The projected AI path reports no likelihood objective and cannot supply
+  this statistic.
 - [x] Gene-level output: pooled $\tau_c$ with per-gene $\sigma_{b,c}^2$
   (empirical-Bayes two-level), matching RareEffect's reporting unit.
 
@@ -472,34 +469,20 @@ coordinates in a weakly identified regime.
 - [ ] Measure GRG compression on exome rare variants — far less favorable than
   WGS; do not inherit the existing benchmark claim.
 
-### Blocking dependency
+### Large-scale evidence boundary
 
-`plan/evolutionary-bolt-lmm.md`'s **production-scale convergence acceptance is
-a hard prerequisite for any fit whose numbers are used as evidence.** The
-multi-component fitter now reuses the single-component score/step rule, with
-the retained sketch defaults, but the rule has not yet passed the documented
-production-scale recovery/failure-diagnostics gate.
+The production convergence policy is implemented, and the persisted `n=2000`
+multi-component benchmark records convergence, recovery, estimates, and runtime
+over ten replicates. That benchmark evidence is intentionally not duplicated by
+large pytest cases.
 
-**There is currently no interim substitute.** An earlier revision of this file
-said reportable fits could be obtained by hand-raising the probe budget. That
-was wrong: a larger sketch budget does not stand in for a convergence policy on
-real-sized data. Nothing legitimises a large-scale estimate until the policy
-exists.
-
-**This binds Phase 2, not only Phase 3.** Phase 2 fits at $n \in \{20\text{k},
-50\text{k}\}$ are the primary evidence for the bias-attribution claims, so they
-are exactly the fits that need a trustworthy convergence rule; they are far
-outside small-dataset territory. Phase 3 remains unreachable for want of UKB
-access, but Phase 2 is active, which makes this the critical path rather than a
-moot gate.
-
-The 2026-08-20 audit found the multi-component fitter non-convergent at
-`n=2000`, returning $h^2 = 0.993$ against a realized truth of $0.187$ with a
-REML objective 942 units worse than the truth. Fixing that, and gating it on a
-parameter-recovery test, precedes any Phase 2 run.
+Phase 2 fits at $n \in \{20\text{k}, 50\text{k}\}$ remain a separate evidence
+gate: every reported fit must satisfy the production convergence policy and
+record its diagnostics at those scales. Hand-raising the probe budget is not a
+substitute. Phase 3 remains inaccessible without UK Biobank approval.
 
 The two-stage sketch/refinement split and automatic probe escalation remain
-deferred cost/precision experiments and are not prerequisites here.
+deferred cost/precision experiments and are not prerequisites.
 
 ---
 
@@ -507,9 +490,8 @@ deferred cost/precision experiments and are not prerequisites here.
 
 ### Phase 0 — Estimand alignment and analytic bias (no data, no new code)
 
-Phase 0 does **not** gate MC0. The partitioned derivation of §2.1 is settled and
-the shared-$W_S$ assumption is taken as standard, so code work in Phase 1 can
-start in parallel with everything below.
+Phase 0 does **not** gate the code extensions. The partitioned derivation of
+§2.1 is settled and the shared-$W_S$ assumption is taken as standard.
 
 1. Derive the asymptotic limit of the flat-prior variance-component estimator
    when the truth is evolutionary, as a function of the observed AFS. For a
@@ -531,8 +513,8 @@ start in parallel with everything below.
 
 ### Phase 1 — Code extensions (MC0–MC3)
 
-Order: MC0 kernel and multi-component REML $\to$ MC1 baselines $\to$ MC2 joint MoM
-$\to$ MC3 reporting. MC4 runs in parallel, needed only for Phase 3.
+MC0–MC2 are complete. MC3 is open only for likelihood-ratio assembly. MC4 is
+independent and needed only for Phase 3.
 
 **Gate:** every rung of the ladder reproduces the rung below it exactly at the
 boundary; **dense-versus-GRG equivalence at the default `cg_tol=5e-4` on a
@@ -542,10 +524,9 @@ RareEffect estimator matches a from-scratch reimplementation on a small dense
 case. The default sketch tolerance is retained for this comparison; it is not
 an independent production-scale convergence guarantee.
 
-Audited 2026-08-20: operator nesting, dense-versus-GRGL comparison, parity, and
-baseline reproduction are met. Production-scale convergence remains open; the
-fitter itself previously failed the `n=2000` recovery audit. See the ledger for
-the specific defects.
+Audited 2026-08-21: operator nesting, dense-versus-GRGL comparison, parity, and
+baseline reproduction are met. Large recovery simulations are benchmark
+evidence rather than pytest cases; see §5, "Large-scale evidence boundary."
 
 ### Phase 2 — Calibrated simulation (primary evidence)
 
@@ -584,8 +565,8 @@ including profile-likelihood intervals for $\tau_c$ (H6); rate at which the MoM
 truncation rule fires and its effect.
 
 **Gate:** H2 and H4 resolved with stated direction and magnitude across $\ge 10$
-replicates, with converged fits (`FitDiagnostics.converged`, `score_norm`,
-`trace_standard_errors` reported for every fit, per `notes/model_fitting.md` §6).
+replicates, with each fit's `ConvergenceReport`, trace standard errors,
+estimates, seed, and runtime recorded per `notes/model_fitting.md` §6.
 
 ### Phase 3 — UKB WES reanalysis (not reachable; no access)
 
@@ -653,10 +634,11 @@ verification setting.
 | Deliverable | Where |
 | --- | --- |
 | This plan | `notes/rare_variant.md` |
-| Implementation ledger items | `plan/evolutionary-bolt-lmm.md` (new Priority section) |
-| Multi-component simplified priors and REML | `src/evo_lmm/` (new module; do not expand `reml.py` in place) |
+| Implementation ledger items | `plan/evolutionary-bolt-lmm.md` (MC0–MC4 active workstream) |
+| Multi-component simplified priors and REML | `src/evo_lmm/multicomponent.py` |
 | Named M0 and MoM-ratio baselines | `src/evo_lmm/baselines.py` |
-| Tests | `tests/test_components_*.py`; ladder-nesting and baseline-reproduction tests |
+| Small deterministic tests | Module-aligned files under `tests/`, especially `test_multicomponent.py`, `test_baselines.py`, and `test_reporting.py` |
+| Large-scale recovery and runtime evidence | Persisted workflows under `benchmarks/`; deliberately not duplicated in pytest |
 | Simulation study | `docs/tutorials/` + persisted artifacts, following the SLiM tutorial pattern |
 | Model invariants: per-class $`\tau_c`$, shared $`W_S`$, composite reading of $`\hat{\tau}_c`$, $`\rho_{ab} \equiv 1`$ | `AGENTS.md` |
 | Manuscript | separate repository |
@@ -665,14 +647,14 @@ verification setting.
 
 ## 9. Immediate next actions
 
-1. Phase 0 items 1–3 (analytic, no code): the flat-prior asymptotic limit, its
-   evaluation on a realistic WES AFS, and the $h^2$ estimand reconciliation.
-2. Pull the two Zenodo deposits; determine what summary-level reanalysis can
+1. Close MC3 by assembling the exact-dense ladder likelihood-ratio statistic
+   and applying the existing boundary-mixture null.
+2. Complete Phase 0 items 1–3: the flat-prior asymptotic limit, its evaluation
+   on a realistic WES AFS, and the $h^2$ estimand reconciliation.
+3. Pull the two Zenodo deposits and determine what summary-level reanalysis can
    support (Phase 0 item 5).
-3. Record the §5 model invariants in `AGENTS.md` and open the `plan/` Priority
-   section for the multi-component kernel.
-4. Begin MC0 — the multi-component simplified prior and its analytic
-   derivatives. This is no longer gated on Phase 0 and can run concurrently.
+4. Prepare the persisted Phase 2 simulation workflow at its specified sample
+   sizes; keep large recovery and runtime checks out of pytest.
 5. Decide separately whether to pursue UKB access at all. It is the only
    long-lead item and nothing in Phases 0–2 waits on it, so it is a strategic
    choice rather than a next action.

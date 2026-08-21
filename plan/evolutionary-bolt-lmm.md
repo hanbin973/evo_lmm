@@ -1,6 +1,6 @@
 # Evolutionary GRGL-backed LMM: status and remaining work
 
-Last audited: 2026-08-20
+Last audited: 2026-08-21
 
 ## Purpose
 
@@ -151,7 +151,7 @@ Evidence:
 - `src/evo_lmm/operators.py`
 - `tests/test_multicomponent.py`
 
-### Phase 1 supporting utilities (MC1–MC3 partial)
+### Baselines and reporting (MC1–MC3 partial)
 
 - [x] Named flat M0 prior and optional MAC-threshold burden collapsing with
   frequency recomputation and source-column provenance.
@@ -258,11 +258,11 @@ multi-component model". Simplified prior only; the full model is frozen.
   per-MAF-bin genic-variance decomposition; scientific-scale delta-method
   standard errors plus profile likelihoods for each `sigma_b2_c` and `tau_c`;
   boundary-aware likelihood-ratio tests; gene-level output with pooled shape
-  parameters. All of it is implemented (see "Phase 1 supporting utilities")
+  parameters. All of it is implemented (see "Baselines and reporting")
   except the likelihood-ratio clause: `boundary_lrt_pvalue()` supplies the
   boundary-mixture null, but nothing assembles the statistic from two fits, and
-  the AI path cannot supply one — its `objective` field is `0.5*||score||^2`,
-  not a likelihood, so an LR statistic can only come from
+  the AI path cannot supply one — it does not evaluate a log-determinant and
+  therefore reports `objective=nan`, so an LR statistic can only come from
   `profiled_reml_objective` on the exact dense path. Closing MC3 means either
   wiring that assembly for the dense path and documenting the restriction, or
   giving the AI path a usable objective.
@@ -278,10 +278,10 @@ Acceptance gate. All four clauses, no qualifiers:
 
 1. **Every** nesting identity holds exactly — not "every implemented" one. An
    identity that is not yet tested is an open gate, not a satisfied one.
-2. **Dense-versus-GRG equivalence at the default `cg_tol=5e-4`, on a small dataset.** This
-   clause was deleted once and is restored deliberately. It is a small-data
-   equivalence check by design: the point is to pin the GRG traversal against a
-   dense oracle where the dense oracle is computable at all.
+2. **Dense-versus-GRG equivalence at the default `cg_tol=5e-4`, on a small
+   dataset.** This is a small-data equivalence check by design: the point is to
+   pin the GRG traversal against a dense oracle where the dense oracle is
+   computable at all.
 3. Single-category fitting delegates to the existing fitter bit-for-bit.
 4. The reproduced RareEffect baseline matches an independent reimplementation on
    a small dense case.
@@ -290,9 +290,7 @@ Acceptance gate. All four clauses, no qualifiers:
 benchmark below uses it unchanged. Priority 2 owns the solver defaults and the
 convergence criterion; this section does not restate them.
 
-Gate status, re-audited 2026-08-20 after the fixes below — **all four clauses
-are met, and the tests that back them have been checked to fail against the
-constructions they replaced.**
+Gate status, re-audited 2026-08-21 — **all four clauses are met.**
 
 1. Nesting: all-`tau_c`-zero and shared-`tau` use independent flat/operator
    constructions and `assert_array_equal`; the single-category identity is now
@@ -301,16 +299,13 @@ constructions they replaced.**
 2. Dense-versus-GRG: in addition to the operator-application oracle, a whole
    two-category fit agrees to `rtol=1e-9` on `sigma_e2`/`h2` and `1e-8` on the
    component parameters at the default `cg_tol=5e-4`, with identical seeds and
-   probe budgets. The earlier status text claimed this clause on the operator
-   test alone, which never enters the CG solve.
+   probe budgets.
 3. Single-category delegation is bit-for-bit. The delegation no longer forces
    `exact=True`: a GRGL-backed single category stays matrix-free at the
    requested `cg_tol` instead of materialising dense kernels.
 4. The RareEffect baseline is compared against an error-contrast
    reimplementation (null-space contrasts and kernel eigenvalues, sharing no
-   helper with `baselines.py`) plus recorded literals. The previous test
-   rebuilt the production algorithm from production helpers and computed its
-   expectation by calling the function under test, so it could not fail.
+   helper with `baselines.py`) plus recorded literals.
 
 The convergence criterion these fits are judged by is recorded under
 Priority 2, "Convergence policy — decided"; convergence and recovery at
@@ -328,53 +323,6 @@ follows from it. What does follow is that `tau_c` is reported with the
 identifiability caveat attached and never as the headline estimand, and that
 the quantity to watch is the accuracy of `sigma_b_c^2` — see the
 smallest-component bias recorded under Priority 2.
-
-Defects found in the same audit, all now fixed:
-
-- The fitter did not converge or recover parameters: at `n=2000` with two
-  categories it returned `converged=False`, `h2 = 0.993` against a truth of
-  `0.187`, `tau` collapsed to zero, and a profiled REML objective of `1050.6`
-  against `108.6` at the truth. Three independent defects, in the order they
-  had to be removed:
-  1. the score omitted the division of the data quadratic by the profiled
-     `sigma_e2`, so it was not the gradient of any objective (the
-     single-component fitter always divided);
-  2. the average-information matrix contracted on the left with `P dV_i P y`
-     instead of `P y`, inserting a third derivative factor and making the
-     matrix indefinite, so the solved step was not a descent direction;
-  3. a rejected line search left the loop instead of escalating the Levenberg
-     damping and continuing. The AI matrix is routinely near-singular in the
-     weakly identified `tau` directions, so the undamped step is dominated by
-     them and the uniform `max_step` cap then squashes the well-identified
-     scale coordinates to nearly zero movement.
-  Score and AI are now extracted into `score_and_information()` and pinned to
-  dense oracles. On a seeded two-category dense case the fitter converges and
-  recovers `h2` to within `0.01`, at a profiled objective better than the
-  objective at the generating parameters. Individual `sigma_b2_c`/`tau_c` are
-  recovered less precisely, which is the documented weak identification, not a
-  fitter defect.
-- Profiles were evaluated on the wrong scale: a fit's scientific-scale
-  `sigma_b2_c` was passed straight into `profiled_reml_objective`, which
-  profiles the residual scale and therefore takes ratios, so every profile and
-  every grid value was off by a factor of `sigma_e2`. Fixed in
-  `reporting._ratio_prior`.
-- `fit_genes()` used `pooled_tau` only as an initialisation, re-estimated every
-  `tau_c` freely, and echoed the input `pooled_tau` back as if it had been
-  held. It now fits with `fit_tau=False` and reports the shapes actually
-  conditioned on.
-- The block-CG operator applied `H` one column at a time, so a GRGL-backed
-  component performed one traversal per column per iteration; it now uses the
-  batched `matmat`. The Hutchinson trace also reuses the probe columns of the
-  single block solve (`z' P dV z` as `(P z)' (dV z)`) instead of taking one
-  extra solve per coordinate, and the derivative right-hand sides for the AI
-  matrix share one block solve. `trace_standard_error` is now reported instead
-  of `nan`.
-- A `nan` placeholder for `last_sigma_e2` reached `SimplifiedPrior` on any loop
-  exit before the in-loop assignments, raising a validator error instead of
-  returning diagnostics. The reported state is seeded from the initial point,
-  and the rejection branch records its own iterate. Covered by
-  `test_max_iter_zero_returns_seeded_diagnostics_instead_of_raising` and
-  `test_first_iteration_line_search_rejection_reports_that_iterate`.
 
 ## Remaining work
 
@@ -479,20 +427,16 @@ immediately after them.
   reported in diagnostics. `tol` keeps only its two remaining roles: accepting
   a vanishing line-search displacement, and `gtol` for the exact dense
   finishing optimizer.
-  Rationale: at a fixed statistical distance from the optimum, `||score||_inf`
+  At a fixed statistical distance from the optimum, `||score||_inf`
   grows roughly like `sqrt(n)`, so an absolute score tolerance demands getting
   `sqrt(n)` times closer as data are added and means something different at
   every sample size. The new statistic is also the one the line search already
   used as its merit function, so the two are no longer inconsistent.
-  Measured on a seeded two-category fixture at the generating parameters:
-  `||score||_inf` went 1.31 -> 13.0 as `n` went 300 -> 2400, while
-  `max_i |step_i|/SE_i` stayed between 0.5 and 2.6.
 - **A rank-deficient information matrix is never scored as converged.**
   `psd_pseudo_inverse` inverts only eigenvalues above `1e-12 * lambda_max`;
   `numpy.linalg.pinv` inverts the small negative eigenvalues a stochastic AI
   carries and returns negative variances, which read as zero standard errors
-  and hence as convergence. A fit whose `tau` ran away to `2.4e8` was declared
-  converged that way during this work.
+  and hence as convergence.
 - **One criterion, one report, in both fitters.** `ConvergenceReport` carries
   `status`, `converged`, `iterations`, `step_se_norm`, `step_se_tol`,
   `newton_decrement`, `score_norm`, `accepted_step`, `ai_condition` and
@@ -504,29 +448,21 @@ immediately after them.
   Status vocabulary: `converged`, `converged_after_dense_finish`,
   `stalled_near_tolerance`, `unidentified`, `line_search_stalled`,
   `iteration_cap`, `optimizer_stalled`, `not_started`, `oracle`; `converged` is
-  the summary over the first four. No path reports a delegated optimizer's own
-  verdict any more: the single-component exact finishing step and the
-  multi-component dense method are both judged by `step_se_tol`, and the
-  finishing step's old `||score||_inf < 1e-4` back-stop — two orders of
-  magnitude looser than the loop's own rule, and sample-size dependent — is
-  gone.
+  the summary over the first four. The single-component exact finishing step
+  and the multi-component dense method are both judged by `step_se_tol`, not a
+  delegated optimizer's own verdict.
 - **`objective` is a REML objective or `nan`, never a surrogate.** The
   stochastic AI paths evaluate no log-determinant, so they report `nan` and the
-  criterion carries the convergence information. An earlier revision put
-  `0.5*||score||^2` in that slot, which was neither a likelihood nor the
-  criterion convergence was declared on. On the exact dense multi-component
-  method the reported `objective` is tested to equal `profiled_reml_objective`
-  at the returned point, so the field means one thing everywhere.
+  criterion carries the convergence information. On the exact dense
+  multi-component method the reported `objective` equals
+  `profiled_reml_objective` at the returned point.
 - **A coordinate the data do not place anywhere is named, not scored.** A
   standard error wider than the `+/-30` log-coordinate box the optimizers clip
   to means the coordinate is unidentified; those coordinates are excluded from
   the criterion and reported as `status="unidentified"` with a warning naming
-  them. Not leniency: on the seeded pure-null association panels these standard
-  errors run to `7e5`-`1.5e10` log units, so score-over-information there is
-  numerical noise over numerical noise — the old rule declared convergence off
-  a score of `9e-7` where the criterion reads `0.70`. Mid-iteration the case
-  returns `inf` instead, so no loop can stop because its information matrix was
-  briefly unusable.
+  them. Mid-iteration an entirely unidentified information matrix returns
+  `inf`, so no loop can stop because its information matrix was briefly
+  unusable.
 - **`tau_c` boundary reporting, report only.** The multi-component fit reports
   each `tau_c` in a regime where it is unidentified, judged on the weights
   `w_j = 1/(1 + 2 tau_c q_j)`: `max_j (1 - w_j) <= 1e-6` (kernel
@@ -573,11 +509,8 @@ GRGL-backed, at the production defaults (`cg_tol=5e-4`, 12 probes) from the
 generic initial point. Results on this machine:
 
 - **Convergence: 10/10 replicates return `status="converged"`.** This is the
-  evidence the deleted acceptance gate asked for, and it is now the reason the
-  question is closed rather than open. The recorded CSV predates the
-  standardized convergence reporting; replicate 0 re-fitted afterwards
-  reproduces the same estimates and the same status, with the `tau_c` boundary
-  warning firing as expected.
+  persisted evidence at this configured scale. The `tau_c` boundary warning
+  fires as expected.
 - **The scales — the primary estimands — are recovered.** Mean and sample SD
   over the ten replicates, against the generating value:
 
@@ -721,8 +654,9 @@ calibrated, end-to-end CPU analysis path in which:
 
 1. simplified evolutionary fits converge with clear diagnostics — the
    criterion and the `status`/boundary diagnostics are implemented
-   (Priority 2, "Convergence policy — decided"); convergence at realistic data
-   size is not demonstrated and, by decision, is not required here;
+   (Priority 2, "Convergence policy — decided"); the persisted `n=2000`
+   multi-component benchmark demonstrates recovery at its configured scale,
+   while Phase 2 owns evidence at its larger target sample sizes;
 2. LOCO association uses the fitted evolutionary covariance and independent
    BOLT-normalized test columns (done);
 3. calibration formulas and dense/GRG equivalence tests pass (done); empirical
